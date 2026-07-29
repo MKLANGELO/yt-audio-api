@@ -1,6 +1,6 @@
 {
   "name": "baixatudo-api",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "API Universal de Download",
   "main": "server.js",
   "scripts": {

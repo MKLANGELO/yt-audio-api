@@ -49,8 +49,9 @@ app.get('/', async (req, res) => {
                     const name = parts[0];
                     const value = parts.slice(1).join('=');
                     netscapeCookieContent += `.instagram.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
-                    netscapeCookieContent += `.youtube.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
+                    netscapeCookieContent += `.facebook.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
                     netscapeCookieContent += `.xvideos.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
+                    netscapeCookieContent += `.youtube.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
                 }
             });
             fs.writeFileSync(cookieFilePath, netscapeCookieContent);
@@ -76,7 +77,7 @@ app.get('/', async (req, res) => {
             delete options.format;
         }
 
-        console.log(`Baixando via youtube-dl-exec: ${mediaUrl}`);
+        console.log(`Baixando URL universal: ${mediaUrl}`);
 
         await youtubedl(mediaUrl, options);
 
@@ -104,8 +105,8 @@ app.get('/', async (req, res) => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) {
             try { fs.unlinkSync(cookieFilePath); } catch (e) {}
         }
-        console.error("Erro no youtube-dl-exec:", err);
-        return res.status(500).json({ error: "Falha ao processar download.", detail: err.message });
+        console.error("Erro no processamento:", err);
+        return res.status(500).json({ error: "Falha ao processar a mídia.", detail: err.message });
     }
 });
 
@@ -128,5 +129,5 @@ app.get('/download/:filename', (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor Universal rodando na porta ${PORT}`);
+    console.log(`Servidor Universal Completo rodando na porta ${PORT}`);
 });
