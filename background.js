@@ -1,6 +1,6 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchMedia") {
-    const cloudApiUrl = "https://yt-audio-api-oyhg.onrender.com";
+    const cloudApiUrl = "https://baixatudo-bvx4.onrender.com";
     const mode = request.mode === "video" ? "video" : "audio";
     const targetUrl = request.url;
 

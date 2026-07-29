@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
             statusEl.innerText = "Sessão autorizada! Iniciando download...";
             statusEl.style.color = "#4BB543";
 
-            const cloudApiUrl = "https://yt-audio-api-oyhg.onrender.com";
+            const cloudApiUrl = "https://baixatudo-bvx4.onrender.com";
             const downloadUrl = `${cloudApiUrl}/download?token=${data.token}`;
 
             chrome.downloads.download({
