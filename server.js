@@ -56,7 +56,7 @@ async function processMedia(req, res, isRecordMode = false) {
     let cookieFilePath = null;
     try {
         const urlObj = new URL(mediaUrl);
-        const targetDomain = urlObj.hostname.includes('youtube.com') ? 'youtube.com' : urlObj.hostname.replace('www.', '');
+        const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
 
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${isRecordMode ? 'rec_' : ''}${Date.now()}.txt`);
@@ -86,14 +86,12 @@ async function processMedia(req, res, isRecordMode = false) {
             options.cookies = cookieFilePath;
         }
 
-        // Força conversão e normalização rigorosa de formato e tipo de arquivo
         if (mode === 'audio') {
             options.extractAudio = true;
             options.audioFormat = 'mp3';
             options.audioQuality = 0;
             options.format = 'bestaudio/best';
         } else {
-            // Se for gravação/stream, força conversão estrita para mp4 universal via ffmpeg
             options.format = 'bestvideo+bestaudio/best';
             options.mergeOutputFormat = 'mp4';
         }
