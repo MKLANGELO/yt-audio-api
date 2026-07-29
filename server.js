@@ -34,22 +34,24 @@ app.post('/', async (req, res) => {
     const mediaUrl = req.body.url;
     const mode = req.body.mode || 'video';
     const browserCookies = req.body.cookies;
+    const customUser = req.body.youtubeUser; // Suporte a login fictício/personalizado para o YouTube
+    const customPass = req.body.youtubePass;
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
-
-    if (mediaUrl === "https://www.facebook.com/" || mediaUrl.match(/^https:\/\/www\.facebook\.com\/[^\/]+\/?$/)) {
-        return res.status(400).json({ error: "URL inválida. Abra um vídeo ou reel específico." });
-    }
 
     let cookieFilePath = null;
     try {
         const urlObj = new URL(mediaUrl);
-        const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
+        const targetDomain = urlObj.hostname.includes('youtube.com') ? 'youtube.com' : urlObj.hostname.replace('www.', '');
 
-        // TESTE TEMPORÁRIO: Ignora cookies se for YouTube para testar download publicamente
-        const isYouTube = targetDomain.includes('youtube.com');
+        // Se o usuário mandou credenciais fictícias para o YouTube, criamos um arquivo .netrc temporário de autenticação
+        let netrcPath = null;
+        if (targetDomain.includes('youtube.com') && customUser && customPass) {
+            netrcPath = path.join(DOWNLOADS_DIR, `netrc_${Date.now()}`);
+            fs.writeFileSync(netrcPath, `machine youtube.com login ${customUser} password ${customPass}\n`, { mode: 0o600 });
+        }
 
-        if (!isYouTube && Array.isArray(browserCookies) && browserCookies.length > 0) {
+        if (!targetDomain.includes('youtube.com') && Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
             browserCookies.forEach(c => {
@@ -73,27 +75,15 @@ app.post('/', async (req, res) => {
             retries: 30
         };
 
-        if (cookieFilePath && fs.existsSync(cookieFilePath)) {
+        if (netrcPath) {
+            options.netrc = true;
+            // O yt-dlp lê o arquivo netrc padrão ou configurado nas opções do sistema
+        } else if (cookieFilePath) {
             options.cookies = cookieFilePath;
         }
 
-        if (isYouTube) {
-            // Força cliente web padrão do yt-dlp sem passar cookies de usuário
-            options.extractorArgs = 'youtube:player_client=web';
-        } else if (targetDomain.includes('facebook.com')) {
-            if (mediaUrl.includes('/stories/')) {
-                options.addHeader = [
-                    'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
-                    'Accept-Language: pt-BR,pt;q=0.9',
-                    'Referer: https://www.facebook.com/'
-                ];
-            } else {
-                options.addHeader = [
-                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept-Language: pt-BR,pt;q=0.9',
-                    'Referer: https://www.facebook.com/'
-                ];
-            }
+        if (targetDomain.includes('youtube.com')) {
+            options.extractorArgs = 'youtube:player_client=mweb,ios,web';
         }
 
         if (mode === 'audio') {
@@ -106,17 +96,18 @@ app.post('/', async (req, res) => {
             options.preferFreeFormats = true;
         }
 
-        console.log(`[ASSERTIVE ENGINE] Processando [${targetDomain}] (Cookies ignorados: ${isYouTube}) | Modo: ${mode} | URL: ${mediaUrl}`);
+        console.log(`[YOUTUBE AUTH ENGINE] Processando URL com login simulado/personalizado: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
+        if (netrcPath && fs.existsSync(netrcPath)) fs.unlinkSync(netrcPath);
 
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
+        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part') && !f.startsWith('netrc_'));
 
         if (!generatedFile) {
-            throw new Error("O motor não conseguiu consolidar o arquivo de mídia no disco.");
+            throw new Error("Falha na autenticação ou consolidação do arquivo do YouTube.");
         }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
@@ -124,8 +115,8 @@ app.post('/', async (req, res) => {
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        console.error("[ENGINE ERROR]", err.message);
-        return res.status(500).json({ error: "Falha na extração de mídia. O link pode estar protegido, expirado ou inacessível.", detail: err.message });
+        console.error("[YOUTUBE AUTH ERROR]", err.message);
+        return res.status(500).json({ error: "Falha no login ou extração do YouTube. Conta fictícia rejeitada pelo servidor de origem.", detail: err.message });
     }
 });
 
@@ -137,16 +128,13 @@ app.get('/download/:filename', (req, res) => {
         res.download(filePath, filename, (err) => {
             setTimeout(() => {
                 try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                        console.log(`[CACHE CLEAN] Arquivo removido com segurança: ${filename}`);
-                    }
+                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
                 } catch(e){}
             }, 5000);
         });
     } else {
-        res.status(404).json({ error: "Arquivo expirado ou já limpo do cache." });
+        res.status(404).json({ error: "Arquivo expirado." });
     }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Motor Profissional de Mídia Ativo."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor com Módulo de Login YouTube Ativo."));
