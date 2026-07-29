@@ -1,3 +1,4 @@
+// Memória Cache Interna
 let cookieCache = {};
 
 function validateSession(domain, cookies) {
@@ -11,6 +12,10 @@ function validateSession(domain, cookies) {
 function cleanUrl(rawUrl) {
   try {
     let urlObj = new URL(rawUrl);
+    // Removemos o parâmetro de playlist do youtube para imitar o "no_playlist: True" do python
+    if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
+        return `https://www.youtube.com/watch?v=${urlObj.searchParams.get('v')}`;
+    }
     if (urlObj.hostname.includes('facebook.com') || urlObj.hostname.includes('instagram.com')) {
        return rawUrl.split('?')[0]; 
     }
@@ -24,9 +29,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchMedia") {
     const urlObj = new URL(request.url);
     const domain = urlObj.hostname.replace('www.', '');
-    
     const urlLimpa = cleanUrl(request.url);
 
+    // Busca os logs do cliente diretamente do navegador
     chrome.cookies.getAll({ domain: domain }, (cookies) => {
       
       if (!validateSession(domain, cookies)) {
@@ -39,13 +44,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          return;
       }
 
-      // MODIFICAÇÃO: Só injeta os cookies se for rede social restrita.
-      // Sites como XVideos vão sem cookies para não ativar o Firewall/Geo-block.
       let cookieHeader = "";
       if (domain.includes("facebook.com") || domain.includes("instagram.com") || domain.includes("youtube.com")) {
           cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
       }
       
+      // Salva no cache interno em memória
       cookieCache[domain] = cookieHeader;
 
       fetch(`https://baixatudo-bvx4.onrender.com/`, {
