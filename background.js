@@ -41,9 +41,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          return;
       }
 
-      // NOVIDADE: Em vez de texto, enviamos o ARRAY COMPLETO de objetos de cookies
       let cookiesToUse = [];
-      if (domain.includes("facebook.com") || domain.includes("instagram.com") || domain.includes("youtube.com") || domain.includes("xvideos.com")) {
+      
+      // CORREÇÃO DE SEGURANÇA: XVideos removido daqui. Ele vai baixar anonimamente para não travar o IP do Render.
+      if (domain.includes("facebook.com") || domain.includes("instagram.com") || domain.includes("youtube.com")) {
           cookiesToUse = cookies;
       }
       
@@ -55,7 +56,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         body: JSON.stringify({
             url: urlLimpa,
             mode: request.mode,
-            cookies: cookieCache[domain] // Envia os dados ricos para o servidor reconstruir
+            cookies: cookieCache[domain]
         })
       })
       .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))
