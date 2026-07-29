@@ -46,7 +46,6 @@ app.post('/', async (req, res) => {
         const urlObj = new URL(mediaUrl);
         const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
 
-        // Converte e injeta os cookies da aba atual (fundamental para AlpaClass e áreas de membros)
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
@@ -75,8 +74,10 @@ app.post('/', async (req, res) => {
             options.cookies = cookieFilePath;
         }
 
-        // Asserção de Cabeçalhos por Ecossistema
-        if (targetDomain.includes('facebook.com')) {
+        // Ajustes assertivos por ecossistema
+        if (targetDomain.includes('youtube.com')) {
+            options.extractorArgs = 'youtube:player_client=android,web';
+        } else if (targetDomain.includes('facebook.com')) {
             if (mediaUrl.includes('/stories/')) {
                 options.addHeader = [
                     'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
@@ -90,13 +91,6 @@ app.post('/', async (req, res) => {
                     'Referer: https://www.facebook.com/'
                 ];
             }
-        } else if (targetDomain.includes('alpaclass.com')) {
-            // Garante headers genéricos de navegador para plataformas de infoproduto
-            options.addHeader = [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Referer: https://institutoforma.alpaclass.com/'
-            ];
         }
 
         if (mode === 'audio') {
@@ -116,10 +110,10 @@ app.post('/', async (req, res) => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
+        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_` ) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
         if (!generatedFile) {
-            throw new Error("O motor não conseguiu consolidar o arquivo. A aula pode exigir permissões avançadas de login ou player protegido.");
+            throw new Error("O motor não conseguiu consolidar o arquivo de mídia no disco.");
         }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
@@ -128,7 +122,7 @@ app.post('/', async (req, res) => {
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         console.error("[ENGINE ERROR]", err.message);
-        return res.status(500).json({ error: "Falha na extração de mídia protegida.", detail: err.message });
+        return res.status(500).json({ error: "Falha na extração de mídia. O link pode estar protegido, expirado ou inacessível.", detail: err.message });
     }
 });
 
