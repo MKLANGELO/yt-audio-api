@@ -27,6 +27,19 @@
             margin-bottom: 15px;
             border: 1px solid #3f3f46;
         }
+        .url-input-container {
+            margin-bottom: 12px;
+        }
+        .url-input-container input {
+            width: 100%;
+            padding: 8px;
+            background: #18181b;
+            border: 1px solid #3f3f46;
+            border-radius: 4px;
+            color: #f4f4f5;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
         .format-options {
             display: flex;
             justify-content: space-around;
@@ -77,9 +90,6 @@
             height: 100%;
             background: linear-gradient(90deg, #10b981, #34d399);
             transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         #progress-text {
             position: absolute;
@@ -104,6 +114,9 @@
     <h3>Media Downloader</h3>
     
     <div class="options-container">
+        <div class="url-input-container">
+            <input type="text" id="media-url" placeholder="Cole a URL do vídeo aqui ou use a aba atual">
+        </div>
         <div class="format-options">
             <label><input type="radio" name="mode" value="video" checked> 🎬 Vídeo</label>
             <label><input type="radio" name="mode" value="audio"> 🎵 Áudio</label>

@@ -1,6 +1,7 @@
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const btnDownload = document.getElementById("btn-download");
   const statusEl = document.getElementById("status");
+  const urlInput = document.getElementById("media-url");
   const progressContainer = document.getElementById("progress-container");
   const progressBar = document.getElementById("progress-bar");
   const progressText = document.getElementById("progress-text");
@@ -8,6 +9,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let progressInterval;
   let currentProgress = 0;
+
+  // Preenche automaticamente com a URL da aba atual ao abrir o plugin
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && tab.url && urlInput) {
+      urlInput.value = tab.url;
+    }
+  } catch (err) {
+    console.error("Erro ao capturar aba:", err);
+  }
 
   function updateProgress(targetPercentage, speedMs) {
     clearInterval(progressInterval);
@@ -32,6 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      const videoUrl = urlInput ? urlInput.value.trim() : "";
+      if (!videoUrl) {
+        statusEl.innerText = "❌ Insira ou cole uma URL válida!";
+        statusEl.style.color = "#ef4444";
+        return;
+      }
+
       const modeInput = document.querySelector('input[name="mode"]:checked');
       const modeSelected = modeInput ? modeInput.value : "video";
       const shouldAskFolder = askFolderCheckbox ? askFolderCheckbox.checked : true;
@@ -44,25 +62,14 @@ document.addEventListener("DOMContentLoaded", () => {
       btnDownload.disabled = true;
       btnDownload.style.opacity = "0.6";
 
-      statusEl.innerText = "Conectando ao servidor...";
+      statusEl.innerText = "Processando no servidor...";
       statusEl.style.color = "#a1a1aa";
 
       updateProgress(85, 150);
 
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const videoUrl = tab && tab.url ? tab.url : "";
-
-        if (!videoUrl || videoUrl === "https://www.facebook.com/" || videoUrl === "https://www.instagram.com/") {
-          clearInterval(progressInterval);
-          statusEl.innerText = "⚠️ Abra o vídeo clicando nele antes de baixar!";
-          statusEl.style.color = "#FF8C00";
-          btnDownload.disabled = false;
-          btnDownload.style.opacity = "1";
-          return;
-        }
-
-        let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
+        let safeTitle = tab && tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
         let extension = modeSelected === "audio" ? "mp3" : "mp4";
 
         chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
