@@ -32,7 +32,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Proteção extra caso o HTML não carregue as opções
       const modeInput = document.querySelector('input[name="mode"]:checked');
       const modeSelected = modeInput ? modeInput.value : "video";
       const shouldAskFolder = askFolderCheckbox ? askFolderCheckbox.checked : true;
@@ -45,88 +44,93 @@ document.addEventListener("DOMContentLoaded", () => {
       btnDownload.disabled = true;
       btnDownload.style.opacity = "0.6";
 
-      statusEl.innerText = "Processando mídia no servidor...";
+      statusEl.innerText = "Procurando player ativo na tela...";
       statusEl.style.color = "#a1a1aa";
 
       updateProgress(85, 150);
 
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const videoUrl = tab && tab.url ? tab.url : "";
-
-        if (!videoUrl) {
-          clearInterval(progressInterval);
-          statusEl.innerText = "❌ Abra uma página de vídeo válida!";
-          statusEl.style.color = "#ef4444";
-          btnDownload.disabled = false;
-          btnDownload.style.opacity = "1";
-          return;
-        }
-
-        let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
-        let extension = modeSelected === "audio" ? "mp3" : "mp4";
-
-        chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
-          clearInterval(progressInterval);
-
-          if (!res || !res.success) {
-            statusEl.innerText = "❌ Erro de comunicação com o servidor.";
-            statusEl.style.color = "#ef4444";
-            btnDownload.disabled = false;
-            btnDownload.style.opacity = "1";
-            return;
-          }
-
-          const { responseOk, status, data } = res;
-
-          if (!responseOk) {
-            const errorMsg = data.detail || data.error || "Erro no servidor.";
+        
+        // Pede ao content.js a URL exata do que está tocando agora
+        chrome.tabs.sendMessage(tab.id, { action: "getPlayingMedia" }, (response) => {
             
-            // SISTEMA ANTIGO RESTAURADO: Redireciona caso o login falhe
-            if (status === 400 && errorMsg.toLowerCase().includes("login")) {
-              let loginUrl = "https://www.youtube.com";
-              if (videoUrl.includes("instagram.com")) loginUrl = "https://www.instagram.com";
-              if (videoUrl.includes("facebook.com")) loginUrl = "https://www.facebook.com";
+            // Se o script responder com a URL rastreada, usa ela. Senão, usa a url geral da aba.
+            let videoUrl = (response && response.url) ? response.url : (tab ? tab.url : "");
 
-              statusEl.innerText = "Sessão expirada! Abrindo tela de login...";
+            // Bloqueio inteligente: se ele não achou nada e tá na página inicial
+            if (!videoUrl || videoUrl === "https://www.facebook.com/" || videoUrl === "https://www.instagram.com/") {
+              clearInterval(progressInterval);
+              statusEl.innerText = "❌ Nenhum vídeo tocando! Dê play no vídeo e tente novamente.";
               statusEl.style.color = "#ffaa00";
-
-              chrome.tabs.create({ url: loginUrl });
               btnDownload.disabled = false;
               btnDownload.style.opacity = "1";
               return;
             }
 
-            statusEl.innerText = "❌ Erro: " + errorMsg;
-            statusEl.style.color = "#ef4444";
-            btnDownload.disabled = false;
-            btnDownload.style.opacity = "1";
-            return;
-          }
+            statusEl.innerText = "Enviando mídia ativa pro servidor...";
 
-          if (data && data.token) {
-            updateProgress(100, 20);
-            
-            statusEl.innerText = shouldAskFolder 
-              ? "Escolha onde salvar o arquivo..." 
-              : "Iniciando download...";
-            statusEl.style.color = "#10b981";
+            let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
+            let extension = modeSelected === "audio" ? "mp3" : "mp4";
 
-            chrome.downloads.download({
-              url: data.token,
-              filename: `${safeTitle}.${extension}`,
-              saveAs: shouldAskFolder
-            }, () => {
-              statusEl.innerText = "✅ Concluído!";
-              btnDownload.disabled = false;
-              btnDownload.style.opacity = "1";
+            // Envia para o motor baixar!
+            chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
+              clearInterval(progressInterval);
+
+              if (!res || !res.success) {
+                statusEl.innerText = "❌ Erro de comunicação com o servidor.";
+                statusEl.style.color = "#ef4444";
+                btnDownload.disabled = false;
+                btnDownload.style.opacity = "1";
+                return;
+              }
+
+              const { responseOk, status, data } = res;
+
+              if (!responseOk) {
+                const errorMsg = data.detail || data.error || "Erro no servidor.";
+                
+                if (status === 400 && errorMsg.toLowerCase().includes("login")) {
+                  let loginUrl = "https://www.youtube.com";
+                  if (videoUrl.includes("instagram.com")) loginUrl = "https://www.instagram.com";
+                  if (videoUrl.includes("facebook.com")) loginUrl = "https://www.facebook.com";
+
+                  statusEl.innerText = "Sessão expirada! Abrindo tela de login...";
+                  statusEl.style.color = "#ffaa00";
+                  chrome.tabs.create({ url: loginUrl });
+                  btnDownload.disabled = false;
+                  btnDownload.style.opacity = "1";
+                  return;
+                }
+
+                statusEl.innerText = "❌ Erro: " + errorMsg;
+                statusEl.style.color = "#ef4444";
+                btnDownload.disabled = false;
+                btnDownload.style.opacity = "1";
+                return;
+              }
+
+              if (data && data.token) {
+                updateProgress(100, 20);
+                statusEl.innerText = shouldAskFolder ? "Escolha onde salvar o arquivo..." : "Iniciando download...";
+                statusEl.style.color = "#10b981";
+
+                chrome.downloads.download({
+                  url: data.token,
+                  filename: `${safeTitle}.${extension}`,
+                  saveAs: shouldAskFolder
+                }, () => {
+                  statusEl.innerText = "✅ Concluído!";
+                  btnDownload.disabled = false;
+                  btnDownload.style.opacity = "1";
+                });
+              } else {
+                statusEl.innerText = "❌ Erro ao gerar o link final.";
+                statusEl.style.color = "#ef4444";
+                btnDownload.disabled = false;
+                btnDownload.style.opacity = "1";
+              }
             });
-          } else {
-            statusEl.innerText = "❌ Erro ao gerar o link final.";
-            statusEl.style.color = "#ef4444";
-            btnDownload.disabled = false;
-            btnDownload.style.opacity = "1";
-          }
         });
 
       } catch (err) {
