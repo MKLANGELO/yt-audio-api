@@ -1,61 +1,83 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <title>Universal Media Downloader</title>
-  <link rel="icon" type="image/png" href="icon.png">
-  <style>
-    body {
-      width: 280px;
-      margin: 0;
-      padding: 16px;
-      background-color: #181818;
-      color: #f1f1f1;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      text-align: center;
-    }
-
-    h2 {
-      font-size: 16px;
-      margin-bottom: 16px;
-      color: #fff;
-    }
-
-    button {
-      width: 100%;
-      background-color: #cc0000;
-      color: white;
-      border: none;
-      padding: 12px;
-      font-size: 14px;
-      font-weight: bold;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    button:hover {
-      background-color: #e60000;
-    }
-
-    #status {
-      margin-top: 14px;
-      font-size: 12px;
-      color: #aaa;
-      word-break: break-word;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Universal Media Downloader</title>
+    <style>
+        body {
+            width: 300px;
+            font-family: Arial, sans-serif;
+            background: #1e1e1e;
+            color: #fff;
+            margin: 0;
+            padding: 15px;
+        }
+        h3 {
+            font-size: 16px;
+            margin-top: 0;
+            text-align: center;
+            color: #4CAF50;
+        }
+        .options {
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-around;
+        }
+        label {
+            font-size: 13px;
+            cursor: pointer;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        #progress-container {
+            width: 100%;
+            background: #444;
+            border-radius: 4px;
+            margin-top: 15px;
+            height: 8px;
+            overflow: hidden;
+            display: none;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.4s ease;
+        }
+        #status {
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: center;
+            color: #aaa;
+            word-break: break-all;
+        }
+    </style>
 </head>
 <body>
+    <h3>Media Downloader</h3>
+    <div class="options">
+        <label><input type="radio" name="mode" value="video" checked> Vídeo (MP4)</label>
+        <label><input type="radio" name="mode" value="audio"> Áudio (MP3)</label>
+    </div>
+    <button id="btn-download">Baixar Mídia</button>
+    
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+    <div id="status">Pronto para iniciar...</div>
 
-  <h2>Baixar Player Atual</h2>
-
-  <button id="btn-download">
-    📥 Baixar Vídeo Rodando
-  </button>
-
-  <div id="status"></div>
-
-  <script src="popup.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>

@@ -1,11 +1,12 @@
 document.addEventListener("DOMContentLoaded", () => {
   const btnDownload = document.getElementById("btn-download");
+  const statusEl = document.getElementById("status");
+  const progressContainer = document.getElementById("progress-container");
+  const progressBar = document.getElementById("progress-bar");
 
   if (btnDownload) {
     btnDownload.onclick = async (e) => {
       if (e) e.preventDefault();
-
-      const statusEl = document.getElementById("status");
 
       if (!navigator.onLine) {
         statusEl.innerText = "Erro: Sem conexão com a internet!";
@@ -13,7 +14,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      statusEl.innerText = "Processando download...";
+      const modeSelected = document.querySelector('input[name="mode"]:checked').value;
+
+      // Exibe e anima a barra de progresso
+      progressContainer.style.display = "block";
+      progressBar.style.width = "30%";
+      statusEl.innerText = "Conectando ao servidor e processando...";
       statusEl.style.color = "#aaa";
 
       try {
@@ -21,15 +27,20 @@ document.addEventListener("DOMContentLoaded", () => {
         const videoUrl = tab && tab.url ? tab.url : "";
 
         if (!videoUrl) {
+          progressContainer.style.display = "none";
           statusEl.innerText = "Abra uma página de vídeo válida!";
           statusEl.style.color = "#ff4444";
           return;
         }
 
-        let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "video_baixado";
+        let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
+        let extension = modeSelected === "audio" ? "mp3" : "mp4";
 
-        chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: "video" }, async (res) => {
+        progressBar.style.width = "60%";
+
+        chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
           if (!res || !res.success) {
+            progressContainer.style.display = "none";
             statusEl.innerText = "Erro de comunicação com a extensão.";
             statusEl.style.color = "#ff4444";
             return;
@@ -38,6 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const { responseOk, status, data } = res;
 
           if (!responseOk) {
+            progressContainer.style.display = "none";
             const errorMsg = data.detail || data.error || "Erro no servidor.";
             statusEl.innerText = "Erro: " + errorMsg;
             statusEl.style.color = "#ff4444";
@@ -45,25 +57,27 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           if (data && data.token) {
-            statusEl.innerText = "Download iniciado!";
+            progressBar.style.width = "90%";
+            statusEl.innerText = "Iniciando download no computador...";
             statusEl.style.color = "#4BB543";
 
-            // Dispara diretamente o download pelo navegador sem abrir abas extras
             chrome.downloads.download({
               url: data.token,
-              filename: `${safeTitle}.mp4`,
-              saveAs: false
+              filename: `${safeTitle}.${extension}`
             }, () => {
+              progressBar.style.width = "100%";
               statusEl.innerText = "Download concluído com sucesso!";
               statusEl.style.color = "#4BB543";
             });
           } else {
-            statusEl.innerText = "Erro: Link de download não retornado.";
+            progressContainer.style.display = "none";
+            statusEl.innerText = "Erro: Token de download não retornado.";
             statusEl.style.color = "#ff4444";
           }
         });
 
       } catch (err) {
+        progressContainer.style.display = "none";
         console.error("Detalhe do erro:", err);
         statusEl.innerText = "Erro inesperado no processo.";
         statusEl.style.color = "#ff4444";
