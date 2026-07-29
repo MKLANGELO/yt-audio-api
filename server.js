@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const ytdlExec = require('yt-dlp-exec');
+const youtubedl = require('youtube-dl-exec');
 const path = require('path');
 const fs = require('fs');
 
@@ -58,27 +58,27 @@ app.get('/', async (req, res) => {
 
         const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
         
-        const ytdlArgs = {
+        const options = {
             output: outputTemplate,
             noCheckCertificates: true,
             noWarnings: true,
-            printJson: true,
+            preferFreeFormats: true,
             format: 'best[ext=mp4]/best'
         };
 
         if (cookieFilePath) {
-            ytdlArgs.cookies = cookieFilePath;
+            options.cookies = cookieFilePath;
         }
 
         if (mode === 'audio') {
-            ytdlArgs.extractAudio = true;
-            ytdlArgs.audioFormat = 'mp3';
-            delete ytdlArgs.format;
+            options.extractAudio = true;
+            options.audioFormat = 'mp3';
+            delete options.format;
         }
 
-        console.log(`Baixando via yt-dlp-exec: ${mediaUrl}`);
+        console.log(`Baixando via youtube-dl-exec: ${mediaUrl}`);
 
-        await ytdlExec(mediaUrl, ytdlArgs);
+        await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) {
             try { fs.unlinkSync(cookieFilePath); } catch (e) {}
@@ -104,7 +104,7 @@ app.get('/', async (req, res) => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) {
             try { fs.unlinkSync(cookieFilePath); } catch (e) {}
         }
-        console.error("Erro no yt-dlp-exec:", err);
+        console.error("Erro no youtube-dl-exec:", err);
         return res.status(500).json({ error: "Falha ao processar download.", detail: err.message });
     }
 });
@@ -128,5 +128,5 @@ app.get('/download/:filename', (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor Universal NPM rodando na porta ${PORT}`);
+    console.log(`Servidor Universal rodando na porta ${PORT}`);
 });

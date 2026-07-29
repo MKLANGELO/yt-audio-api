@@ -1,6 +1,6 @@
 {
   "name": "baixatudo-api",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "API Universal de Download",
   "main": "server.js",
   "scripts": {
@@ -9,7 +9,7 @@
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "yt-dlp-exec": "^2.5.8"
+    "youtube-dl-exec": "^3.1.9"
   },
   "engines": {
     "node": ">=18.0.0"
