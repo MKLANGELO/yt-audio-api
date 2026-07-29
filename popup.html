@@ -5,78 +5,131 @@
     <title>Universal Media Downloader</title>
     <style>
         body {
-            width: 300px;
-            font-family: Arial, sans-serif;
-            background: #1e1e1e;
-            color: #fff;
+            width: 320px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #18181b;
+            color: #f4f4f5;
             margin: 0;
-            padding: 15px;
+            padding: 20px;
+            box-sizing: border-box;
         }
         h3 {
-            font-size: 16px;
+            font-size: 18px;
             margin-top: 0;
             text-align: center;
-            color: #4CAF50;
+            color: #10b981;
+            font-weight: 600;
+            letter-spacing: 0.5px;
         }
-        .options {
-            margin-bottom: 12px;
+        .options-container {
+            background: #27272a;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #3f3f46;
+        }
+        .format-options {
             display: flex;
             justify-content: space-around;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #3f3f46;
+        }
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #d4d4d8;
         }
         label {
-            font-size: 13px;
+            font-size: 14px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
         button {
             width: 100%;
-            padding: 10px;
-            background: #4CAF50;
-            color: white;
+            padding: 12px;
+            background: #10b981;
+            color: #ffffff;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
         }
         button:hover {
-            background: #45a049;
+            background: #059669;
+            transform: translateY(-1px);
+        }
+        button:active {
+            transform: translateY(0);
         }
         #progress-container {
             width: 100%;
-            background: #444;
-            border-radius: 4px;
+            background: #3f3f46;
+            border-radius: 6px;
             margin-top: 15px;
-            height: 8px;
+            height: 16px;
             overflow: hidden;
             display: none;
+            position: relative;
         }
         #progress-bar {
             width: 0%;
             height: 100%;
-            background: #4CAF50;
-            transition: width 0.4s ease;
+            background: linear-gradient(90deg, #10b981, #34d399);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            line-height: 16px;
         }
         #status {
-            font-size: 12px;
-            margin-top: 10px;
+            font-size: 13px;
+            margin-top: 12px;
             text-align: center;
-            color: #aaa;
-            word-break: break-all;
+            color: #a1a1aa;
+            word-break: break-word;
+            min-height: 18px;
         }
     </style>
 </head>
 <body>
     <h3>Media Downloader</h3>
-    <div class="options">
-        <label><input type="radio" name="mode" value="video" checked> Vídeo (MP4)</label>
-        <label><input type="radio" name="mode" value="audio"> Áudio (MP3)</label>
+    
+    <div class="options-container">
+        <div class="format-options">
+            <label><input type="radio" name="mode" value="video" checked> 🎬 Vídeo</label>
+            <label><input type="radio" name="mode" value="audio"> 🎵 Áudio</label>
+        </div>
+        <div class="checkbox-option">
+            <input type="checkbox" id="ask-folder" checked>
+            <label for="ask-folder">Escolher pasta ao baixar</label>
+        </div>
     </div>
-    <button id="btn-download">Baixar Mídia</button>
+
+    <button id="btn-download">Iniciar Download</button>
     
     <div id="progress-container">
+        <div id="progress-text">0%</div>
         <div id="progress-bar"></div>
     </div>
-    <div id="status">Pronto para iniciar...</div>
+    <div id="status">Pronto para iniciar.</div>
 
     <script src="popup.js"></script>
 </body>
