@@ -13,8 +13,25 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
+// Limpeza automática de arquivos antigos a cada inicialização ou ciclo
+function cleanOldFiles() {
+    try {
+        const files = fs.readdirSync(DOWNLOADS_DIR);
+        const now = Date.now();
+        files.forEach(f => {
+            const filePath = path.join(DOWNLOADS_DIR, f);
+            const stats = fs.statSync(filePath);
+            // Remove arquivos com mais de 5 minutos do disco do Render
+            if (now - stats.mtime.getTime() > 300000) {
+                fs.unlinkSync(filePath);
+            }
+        });
+    } catch(e) {}
+}
+
 app.post('/', async (req, res) => {
     req.setTimeout(300000); 
+    cleanOldFiles();
 
     const mediaUrl = req.body.url;
     const mode = req.body.mode || 'video';
@@ -28,7 +45,7 @@ app.post('/', async (req, res) => {
         
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
-            let netscapeContent = "# Netscape HTTP Cookie File\n# https://curl.se/docs/http/cookies.html\n\n";
+            let netscapeContent = "# Netscape HTTP Cookie File\n\n";
             browserCookies.forEach(c => {
                 let d = c.domain.startsWith('.') ? c.domain : `.${c.domain}`;
                 netscapeContent += `${d}\tTRUE\t${c.path || '/'}\t${c.secure ? 'TRUE' : 'FALSE'}\t${c.expirationDate ? Math.floor(c.expirationDate) : 2147483647}\t${c.name}\t${c.value}\n`;
@@ -36,8 +53,8 @@ app.post('/', async (req, res) => {
             fs.writeFileSync(cookieFilePath, netscapeContent);
         }
 
-        const baseFileName = `${Date.now()}_%(title)s.%(ext)s`;
-        const outputTemplate = path.join(DOWNLOADS_DIR, baseFileName);
+        const uniqueId = Date.now();
+        const outputTemplate = path.join(DOWNLOADS_DIR, `${uniqueId}_%(title)s.%(ext)s`);
         
         const options = {
             output: outputTemplate,
@@ -54,7 +71,6 @@ app.post('/', async (req, res) => {
             options.cookies = cookieFilePath;
         }
 
-        // Tratamento especial para o Facebook e Stories para evitar bloqueios de API
         if (targetDomain.includes('facebook.com')) {
             options.addHeader = [
                 'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
@@ -64,13 +80,11 @@ app.post('/', async (req, res) => {
         }
 
         if (mode === 'audio') {
-            console.log(`Convertendo áudio via FFmpeg: ${mediaUrl}`);
             options.extractAudio = true;
             options.audioFormat = 'mp3';
             options.audioQuality = 0;
             options.format = 'bestaudio/best';
         } else {
-            console.log(`Baixando Formato Original de Vídeo/Story: ${mediaUrl}`);
             options.format = 'best[ext=mp4]/best[ext=webm]/best';
             options.preferFreeFormats = true;
         }
@@ -79,30 +93,39 @@ app.post('/', async (req, res) => {
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
+        // Localiza exatamente o arquivo gerado para esta requisição
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const recentFile = files
-            .filter(f => !f.endsWith('.txt'))
-            .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
-            .sort((a, b) => b.time - a.time)[0];
+        const targetFile = files.find(f => f.startsWith(`${uniqueId}_`) && !f.endsWith('.txt'));
 
-        if (!recentFile) throw new Error("Falha na geração do arquivo no disco.");
+        if (!targetFile) throw new Error("Arquivo não encontrado após o download.");
 
-        return res.json({ token: `${req.protocol}://${req.get('host')}/download/${recentFile.name}`, file: recentFile.name });
+        const downloadToken = `${req.protocol}://${req.get('host')}/download/${targetFile}`;
+        return res.json({ token: downloadToken, file: targetFile });
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        console.error("Erro yt-dlp detalhado:", err.message);
-        return res.status(500).json({ error: "Falha na extração. O Story pode ter expirado ou exigido login.", detail: err.message });
+        console.error("Erro yt-dlp disco:", err.message);
+        return res.status(500).json({ error: "Falha ao processar mídia. Verifique se o link está acessível.", detail: err.message });
     }
 });
 
+// Endpoint que faz o streaming direto do Render para o dispositivo do usuário e se auto-destrói do disco
 app.get('/download/:filename', (req, res) => {
-    const filePath = path.join(DOWNLOADS_DIR, req.params.filename);
+    const filename = req.params.filename;
+    const filePath = path.join(DOWNLOADS_DIR, filename);
+    
     if (fs.existsSync(filePath)) {
-        res.download(filePath, req.params.filename, (err) => {
-            if (!err) setTimeout(() => { try { fs.unlinkSync(filePath); } catch(e){} }, 10000);
+        res.download(filePath, filename, (err) => {
+            // Auto-deleta o arquivo do disco do Render imediatamente após o envio ao usuário concluir
+            setTimeout(() => {
+                try {
+                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                } catch(e){}
+            }, 1000);
         });
-    } else res.status(404).json({ error: "Arquivo expirado." });
+    } else {
+        res.status(404).json({ error: "Arquivo expirado ou já baixado." });
+    }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor otimizado rodando."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor com cache inteligente ativo."));
