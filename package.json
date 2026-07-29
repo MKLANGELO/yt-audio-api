@@ -1,17 +1,15 @@
 {
-  "name": "baixatudo-api",
-  "version": "2.5.0",
-  "description": "API Universal de Download",
+  "name": "yt-audio-api",
+  "version": "1.0.0",
+  "description": "API de conversão universal",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "youtube-dl-exec": "^3.1.9"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "express": "^4.18.2",
+    "youtube-dl-exec": "^2.4.15",
+    "ffmpeg-static": "^5.2.0"
   }
 }
