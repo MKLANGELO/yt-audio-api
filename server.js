@@ -5,7 +5,17 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-app.use(cors());
+
+// Configuração robusta de CORS para aceitar requisições de extensões do Chrome e clientes externos
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
+
+// Tratamento explícito para requisições de pré-voo (OPTIONS)
+app.options('*', cors());
+
 app.use(express.json());
 
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
