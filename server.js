@@ -27,11 +27,28 @@ function cleanOldFiles() {
     } catch(e) {}
 }
 
+// Limpa parâmetros de playlist e lixo de URL do YouTube para evitar falhas no motor
+function sanitizeUrl(inputUrl) {
+    try {
+        const parsed = new URL(inputUrl);
+        if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
+            if (parsed.searchParams.has('v')) {
+                const videoId = parsed.searchParams.get('v');
+                return `https://www.youtube.com/watch?v=${videoId}`;
+            }
+        }
+        return inputUrl;
+    } catch (e) {
+        return inputUrl;
+    }
+}
+
 app.post('/', async (req, res) => {
     req.setTimeout(300000); 
     cleanOldFiles();
 
-    const mediaUrl = req.body.url;
+    const rawUrl = req.body.url;
+    const mediaUrl = sanitizeUrl(rawUrl);
     const mode = req.body.mode || 'video';
     const browserCookies = req.body.cookies;
 
@@ -107,7 +124,7 @@ app.post('/', async (req, res) => {
             options.preferFreeFormats = true;
         }
 
-        console.log(`[ASSERTIVE ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
+        console.log(`[ASSERTIVE ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL Limpa: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
@@ -134,7 +151,8 @@ app.post('/record-stream', async (req, res) => {
     req.setTimeout(300000); 
     cleanOldFiles();
 
-    const mediaUrl = req.body.url;
+    const rawUrl = req.body.url;
+    const mediaUrl = sanitizeUrl(rawUrl);
     const mode = req.body.mode || 'video';
     const browserCookies = req.body.cookies;
 
@@ -184,7 +202,7 @@ app.post('/record-stream', async (req, res) => {
             options.audioQuality = 0;
         }
 
-        console.log(`[SERVER STREAM RECORDER] Gravando stream no servidor [${targetDomain}] | URL: ${mediaUrl}`);
+        console.log(`[SERVER STREAM RECORDER] Gravando stream no servidor [${targetDomain}] | URL Limpa: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
