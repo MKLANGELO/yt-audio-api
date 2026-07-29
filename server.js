@@ -8,6 +8,7 @@ const ffmpegPath = require('ffmpeg-static');
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
@@ -44,27 +45,33 @@ app.post('/', async (req, res) => {
             geoBypass: true,
             noPlaylist: true,
             noWarnings: true,
-            ffmpegLocation: ffmpegPath, // Conecta a ferramenta de conversão nativa
+            ffmpegLocation: ffmpegPath,
             socketTimeout: 300,
             retries: 30
         };
 
         if (cookieFilePath) {
             options.cookies = cookieFilePath;
-            if (targetDomain.includes('youtube')) options.extractorArgs = 'youtube:player_client=web'; 
+        }
+
+        // Tratamento especial para o Facebook e Stories para evitar bloqueios de API
+        if (targetDomain.includes('facebook.com')) {
+            options.addHeader = [
+                'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
+                'Accept-Language: pt-BR,pt;q=0.9',
+                'Referer: https://www.facebook.com/'
+            ];
         }
 
         if (mode === 'audio') {
-            // Se for áudio: extrai e converte pesado pra MP3
-            console.log(`Conversão de Áudio Ativada via FFmpeg: ${mediaUrl}`);
+            console.log(`Convertendo áudio via FFmpeg: ${mediaUrl}`);
             options.extractAudio = true;
             options.audioFormat = 'mp3';
             options.audioQuality = 0;
             options.format = 'bestaudio/best';
         } else {
-            // Se for vídeo: baixa a melhor mídia original unificada, sem forçar mp4
-            console.log(`Baixando Formato Original de Vídeo: ${mediaUrl}`);
-            options.format = 'best'; 
+            console.log(`Baixando Formato Original de Vídeo/Story: ${mediaUrl}`);
+            options.format = 'best[ext=mp4]/best[ext=webm]/best';
             options.preferFreeFormats = true;
         }
 
@@ -78,14 +85,14 @@ app.post('/', async (req, res) => {
             .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
             .sort((a, b) => b.time - a.time)[0];
 
-        if (!recentFile) throw new Error("Falha na geração do arquivo.");
+        if (!recentFile) throw new Error("Falha na geração do arquivo no disco.");
 
         return res.json({ token: `${req.protocol}://${req.get('host')}/download/${recentFile.name}`, file: recentFile.name });
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        console.error("Erro yt-dlp:", err.message);
-        return res.status(500).json({ error: "Falha na conversão/download.", detail: err.message });
+        console.error("Erro yt-dlp detalhado:", err.message);
+        return res.status(500).json({ error: "Falha na extração. O Story pode ter expirado ou exigido login.", detail: err.message });
     }
 });
 
@@ -98,4 +105,4 @@ app.get('/download/:filename', (req, res) => {
     } else res.status(404).json({ error: "Arquivo expirado." });
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0');
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor otimizado rodando."));
