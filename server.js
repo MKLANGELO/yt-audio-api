@@ -27,7 +27,6 @@ function cleanOldFiles() {
     } catch(e) {}
 }
 
-// Validador Assertivo de Cookies baseados no Domínio Alvo
 function assertSessionIntegrity(domain, cookieFilePath) {
     if (!cookieFilePath || !fs.existsSync(cookieFilePath)) return true;
     try {
@@ -53,12 +52,16 @@ app.post('/', async (req, res) => {
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
+    // Bloqueio preventivo para URLs genéricas que não contêm mídia
+    if (mediaUrl === "https://www.facebook.com/" || mediaUrl.match(/^https:\/\/www\.facebook\.com\/[^\/]+\/?$/)) {
+        return res.status(400).json({ error: "URL inválida. Você tentou baixar a página inicial ou um perfil. Abra um vídeo ou reel específico." });
+    }
+
     let cookieFilePath = null;
     try {
         const urlObj = new URL(mediaUrl);
-        const targetDomain = urlObj.hostname.replace('www.', '');
+        const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
 
-        // 1. Geração do Arquivo de Cookies em Formato Netscape
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
@@ -69,7 +72,6 @@ app.post('/', async (req, res) => {
             fs.writeFileSync(cookieFilePath, netscapeContent);
         }
 
-        // 2. Validação Assertiva de Integridade de Sessão
         if (!targetDomain.includes('xvideos.com')) {
             assertSessionIntegrity(targetDomain, cookieFilePath);
         }
@@ -92,18 +94,25 @@ app.post('/', async (req, res) => {
             options.cookies = cookieFilePath;
         }
 
-        // 3. Estratégia Assertiva por Plataforma (Asserção de Headers e Clientes)
-        if (targetDomain.includes('youtube.com')) {
-            options.extractorArgs = 'youtube:player_client=web';
-        } else if (targetDomain.includes('facebook.com')) {
-            options.addHeader = [
-                'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
-                'Accept-Language: pt-BR,pt;q=0.9',
-                'Referer: https://www.facebook.com/'
-            ];
+        // Configuração assertiva de headers baseada no tipo exato de URL do Facebook
+        if (targetDomain.includes('facebook.com')) {
+            if (mediaUrl.includes('/stories/')) {
+                // Stories exigem emulação mobile estrita
+                options.addHeader = [
+                    'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
+                    'Accept-Language: pt-BR,pt;q=0.9',
+                    'Referer: https://www.facebook.com/'
+                ];
+            } else {
+                // Vídeos e Reels do Facebook rodam perfeitamente com User-Agent Desktop do Chrome
+                options.addHeader = [
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept-Language: pt-BR,pt;q=0.9',
+                    'Referer: https://www.facebook.com/'
+                ];
+            }
         }
 
-        // 4. Mapeamento Assertivo de Formato (Modo Vídeo vs Áudio)
         if (mode === 'audio') {
             options.extractAudio = true;
             options.audioFormat = 'mp3';
@@ -116,12 +125,10 @@ app.post('/', async (req, res) => {
 
         console.log(`[ASSERTIVE ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
         
-        // Execução controlada com garantia de integridade de stream
         await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
-        // Identificação exata do arquivo gerado
         const files = fs.readdirSync(DOWNLOADS_DIR);
         const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
