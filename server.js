@@ -13,6 +13,7 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
+// Limpeza segura de arquivos com mais de 10 minutos para evitar acúmulo no Render
 function cleanOldFiles() {
     try {
         const files = fs.readdirSync(DOWNLOADS_DIR);
@@ -20,7 +21,7 @@ function cleanOldFiles() {
         files.forEach(f => {
             const filePath = path.join(DOWNLOADS_DIR, f);
             const stats = fs.statSync(filePath);
-            if (now - stats.mtime.getTime() > 300000) {
+            if (now - stats.mtime.getTime() > 600000) {
                 fs.unlinkSync(filePath);
             }
         });
@@ -51,7 +52,9 @@ app.post('/', async (req, res) => {
             fs.writeFileSync(cookieFilePath, netscapeContent);
         }
 
-        const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
+        // Padrão exato de salvamento no disco com timestamp e extensão original gerada pelo yt-dlp
+        const filePrefix = Date.now();
+        const outputTemplate = path.join(DOWNLOADS_DIR, `${filePrefix}_%(title)s.%(ext)s`);
         
         const options = {
             output: outputTemplate,
@@ -86,46 +89,49 @@ app.post('/', async (req, res) => {
             options.preferFreeFormats = true;
         }
 
-        console.log(`Baixando mídia: ${mediaUrl}`);
+        console.log(`Baixando mídia com ID [${filePrefix}]: ${mediaUrl}`);
         await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
-        // CAPTURA BLINDADA: Pega o arquivo mais recente modificado na pasta de downloads (excluindo arquivos de texto)
+        // Varre a pasta de downloads procurando o arquivo que começa exatamente com este timestamp único
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const validFiles = files.filter(f => !f.endsWith('.txt') && !f.endsWith('.part'));
-        
-        if (validFiles.length === 0) throw new Error("Nenhum arquivo de mídia foi gerado no disco.");
+        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
-        const recentFile = validFiles
-            .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
-            .sort((a, b) => b.time - a.time)[0].name;
+        if (!generatedFile) {
+            throw new Error("Nenhum arquivo correspondente foi gravado no disco.");
+        }
 
-        const downloadToken = `${req.protocol}://${req.get('host')}/download/${recentFile}`;
-        return res.json({ token: downloadToken, file: recentFile });
+        const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
+        return res.json({ token: downloadToken, file: generatedFile });
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         console.error("Erro yt-dlp disco:", err.message);
-        return res.status(500).json({ error: "Falha ao processar mídia. O link pode estar protegido.", detail: err.message });
+        return res.status(500).json({ error: "Falha ao gerar o arquivo de mídia.", detail: err.message });
     }
 });
 
+// Rota de entrega: Mantém o arquivo no servidor durante o envio e só limpa após o download do usuário finalizar
 app.get('/download/:filename', (req, res) => {
-    const filename = req.params.filename;
+    const filename = decodeURIComponent(req.params.filename);
     const filePath = path.join(DOWNLOADS_DIR, filename);
     
     if (fs.existsSync(filePath)) {
         res.download(filePath, filename, (err) => {
+            // Garante que o arquivo só será apagado do servidor DEPOIS que o usuário terminar de baixar
             setTimeout(() => {
                 try {
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log(`Cache limpo com sucesso para o arquivo: ${filename}`);
+                    }
                 } catch(e){}
-            }, 1000);
+            }, 5000); // 5 segundos de folga após o término do stream
         });
     } else {
-        res.status(404).json({ error: "Arquivo expirado ou já baixado." });
+        res.status(404).json({ error: "Arquivo expirado ou já removido do cache." });
     }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor ajustado rodando."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor sincronizado rodando."));
