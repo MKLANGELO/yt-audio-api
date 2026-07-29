@@ -1,11 +1,10 @@
 document.addEventListener("DOMContentLoaded", async () => {
   const btnDownload = document.getElementById("btn-download");
+  const btnRecord = document.getElementById("btn-record");
   const statusEl = document.getElementById("status");
   const urlInput = document.getElementById("media-url");
   const progressContainer = document.getElementById("progress-container");
   const progressBar = document.getElementById("progress-bar");
-  const progressText = document.getElementById("progress-text");
-  const askFolderCheckbox = document.getElementById("ask-folder");
 
   let progressInterval;
   let currentProgress = 0;
@@ -15,9 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (tab && tab.url && urlInput) {
       urlInput.value = tab.url;
     }
-  } catch (err) {
-    console.error("Erro ao capturar aba:", err);
-  }
+  } catch (err) {}
 
   function updateProgress(targetPercentage, speedMs) {
     clearInterval(progressInterval);
@@ -25,116 +22,69 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (currentProgress < targetPercentage) {
         currentProgress++;
         if (progressBar) progressBar.style.width = currentProgress + "%";
-        if (progressText) progressText.innerText = currentProgress + "%";
       } else {
         clearInterval(progressInterval);
       }
     }, speedMs);
   }
 
-  if (btnDownload) {
-    btnDownload.onclick = async (e) => {
-      if (e) e.preventDefault();
-
-      if (!navigator.onLine) {
-        statusEl.innerText = "❌ Sem conexão com a internet!";
-        statusEl.style.color = "#ef4444";
-        return;
-      }
-
+  if (btnRecord) {
+    btnRecord.onclick = async (e) => {
+      e.preventDefault();
       const videoUrl = urlInput ? urlInput.value.trim() : "";
       if (!videoUrl) {
-        statusEl.innerText = "❌ Insira ou cole uma URL válida!";
+        statusEl.innerText = "❌ Insira uma URL válida!";
         statusEl.style.color = "#ef4444";
         return;
       }
 
-      const modeInput = document.querySelector('input[name="mode"]:checked');
-      const modeSelected = modeInput ? modeInput.value : "video";
-      const shouldAskFolder = askFolderCheckbox ? askFolderCheckbox.checked : true;
+      const modeSelected = document.querySelector('input[name="mode"]:checked').value;
+      const shouldAskFolder = document.getElementById("ask-folder").checked;
 
       currentProgress = 0;
       if (progressContainer) progressContainer.style.display = "block";
       if (progressBar) progressBar.style.width = "0%";
-      if (progressText) progressText.innerText = "0%";
-      
-      btnDownload.disabled = true;
-      btnDownload.style.opacity = "0.6";
 
-      statusEl.innerText = "Processando mídia no servidor...";
-      statusEl.style.color = "#a1a1aa";
+      btnRecord.disabled = true;
+      btnRecord.style.opacity = "0.6";
+      statusEl.innerText = "🔄 Gravando stream no servidor... Aguarde.";
+      statusEl.style.color = "#3b82f6";
 
-      updateProgress(85, 150);
+      updateProgress(90, 200);
 
-      try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        let safeTitle = tab && tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
-        let extension = modeSelected === "audio" ? "mp3" : "mp4";
-
-        chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
-          clearInterval(progressInterval);
-
-          if (!res || !res.success) {
-            statusEl.innerText = "❌ Erro de comunicação com o servidor.";
-            statusEl.style.color = "#ef4444";
-            btnDownload.disabled = false;
-            btnDownload.style.opacity = "1";
-            return;
-          }
-
-          const { responseOk, status, data } = res;
-
-          if (!responseOk) {
-            const errorMsg = data.detail || data.error || "Erro no servidor.";
-            
-            if (status === 400 && errorMsg.toLowerCase().includes("login")) {
-              let loginUrl = "https://www.facebook.com";
-              if (videoUrl.includes("instagram.com")) loginUrl = "https://www.instagram.com";
-
-              statusEl.innerText = "Sessão expirada! Abrindo tela de login...";
-              statusEl.style.color = "#ffaa00";
-              chrome.tabs.create({ url: loginUrl });
-              btnDownload.disabled = false;
-              btnDownload.style.opacity = "1";
-              return;
-            }
-
-            statusEl.innerText = "❌ Erro: " + errorMsg;
-            statusEl.style.color = "#ef4444";
-            btnDownload.disabled = false;
-            btnDownload.style.opacity = "1";
-            return;
-          }
-
-          if (data && data.token) {
-            updateProgress(100, 20);
-            statusEl.innerText = shouldAskFolder ? "Escolha onde salvar o arquivo..." : "Iniciando download...";
-            statusEl.style.color = "#10b981";
-
-            chrome.downloads.download({
-              url: data.token,
-              filename: `${safeTitle}.${extension}`,
-              saveAs: shouldAskFolder
-            }, () => {
-              statusEl.innerText = "✅ Concluído!";
-              btnDownload.disabled = false;
-              btnDownload.style.opacity = "1";
-            });
-          } else {
-            statusEl.innerText = "❌ Erro ao gerar o link final da mídia.";
-            statusEl.style.color = "#ef4444";
-            btnDownload.disabled = false;
-            btnDownload.style.opacity = "1";
-          }
-        });
-
-      } catch (err) {
+      chrome.runtime.sendMessage({ action: "recordServerStream", url: videoUrl, mode: modeSelected }, (res) => {
         clearInterval(progressInterval);
-        statusEl.innerText = "❌ Erro inesperado.";
-        statusEl.style.color = "#ef4444";
-        btnDownload.disabled = false;
-        btnDownload.style.opacity = "1";
-      }
+
+        if (!res || !res.success || !res.responseOk) {
+          statusEl.innerText = "❌ Erro ao gravar stream no servidor.";
+          statusEl.style.color = "#ef4444";
+          btnRecord.disabled = false;
+          btnRecord.style.opacity = "1";
+          return;
+        }
+
+        const { data } = res;
+        if (data && data.token) {
+          if (progressBar) progressBar.style.width = "100%";
+          statusEl.innerText = "✅ Stream gravado! Baixando arquivo...";
+          statusEl.style.color = "#10b981";
+
+          chrome.downloads.download({
+            url: data.token,
+            filename: data.file.replace(/^rec_\d+_+/, ''),
+            saveAs: shouldAskFolder
+          }, () => {
+            statusEl.innerText = "✅ Concluído e cache limpo!";
+            btnRecord.disabled = false;
+            btnRecord.style.opacity = "1";
+          });
+        } else {
+          statusEl.innerText = "❌ Erro ao gerar arquivo do stream.";
+          statusEl.style.color = "#ef4444";
+          btnRecord.disabled = false;
+          btnRecord.style.opacity = "1";
+        }
+      });
     };
   }
 });
