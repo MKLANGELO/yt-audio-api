@@ -5,7 +5,8 @@
     <title>Media Downloader</title>
     <style>
         body { width: 300px; font-family: Arial, sans-serif; padding: 10px; background: #121212; color: #fff; margin: 0; }
-        h3 { font-size: 14px; margin-bottom: 8px; color: #10b981; text-align: center; }
+        h3 { font-size: 14px; margin-bottom: 6px; color: #10b981; text-align: center; }
+        .notice { font-size: 10px; color: #fbbf24; background: #1e1e1e; border: 1px dashed #fbbf24; padding: 5px; border-radius: 4px; margin-bottom: 8px; text-align: center; line-height: 1.2; }
         input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; background: #1e1e1e; border: 1px solid #333; color: #fff; border-radius: 4px; margin-bottom: 8px; }
         .modes { display: flex; justify-content: space-around; margin-bottom: 8px; font-size: 12px; }
         button { width: 100%; padding: 8px; background: #10b981; border: none; color: #fff; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 4px; }
@@ -18,6 +19,11 @@
 </head>
 <body>
     <h3>Media Downloader & Sniffer</h3>
+    
+    <div class="notice">
+        ⚠️ <strong>Aviso:</strong> Abra o vídeo, Reels, TikTok, Instagram, etc., ou copie o link direto do vídeo antes de clicar!
+    </div>
+
     <input type="text" id="media-url" placeholder="URL da mídia...">
     
     <div class="modes">
