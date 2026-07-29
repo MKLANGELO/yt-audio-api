@@ -1,23 +1,21 @@
 const express = require('express');
 const cors = require('cors');
-const ytdl = require('@distube/ytdl-core');
+const ytdlExec = require('yt-dlp-exec');
 const path = require('path');
 const fs = require('fs');
 
 const app = express();
 
-// Configuração global de CORS ultra-permissiva para a extensão
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Browser-Cookies']
 }));
 
-// Força os cabeçalhos de CORS manualmente em TODAS as respostas (evita bloqueio em caso de erro)
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Browser-Cookies");
     if (req.method === 'OPTIONS') {
         return res.sendStatus(200);
     }
@@ -32,67 +30,79 @@ if (!fs.existsSync(DOWNLOADS_DIR)) {
 }
 
 app.get('/', async (req, res) => {
-    let mediaUrl = req.query.url;
+    const mediaUrl = req.query.url;
     const mode = req.query.mode || 'video';
+    const browserCookies = req.headers['x-browser-cookies'];
 
     if (!mediaUrl) {
         return res.status(400).json({ error: "Missing 'url' parameter in request." });
     }
 
-    // Validação inicial para garantir que é uma URL do YouTube suportada pelo ytdl-core
-    if (!mediaUrl.includes('youtube.com') && !mediaUrl.includes('youtu.be')) {
-        return res.status(400).json({ 
-            error: "Esta API atualmente suporta apenas links do YouTube (@distube/ytdl-core). Links do Instagram ou outras plataformas precisam de tratamentos específicos." 
-        });
-    }
-
-    if (mediaUrl.includes('youtube.com/watch') && mediaUrl.includes('&list=')) {
-        try {
-            const urlObj = new URL(mediaUrl);
-            const videoId = urlObj.searchParams.get('v');
-            if (videoId) {
-                mediaUrl = `https://www.youtube.com/watch?v=${videoId}`;
-            }
-        } catch (e) {}
-    }
-
-    if (!ytdl.validateURL(mediaUrl)) {
-        return res.status(400).json({ error: "URL inválida ou não suportada pelo YouTube." });
-    }
-
     try {
-        const info = await ytdl.getInfo(mediaUrl);
-        const title = info.videoDetails.title.replace(/[^a-zA-Z0-9]/g, '_');
-        const fileExtension = mode === 'audio' ? 'mp3' : 'mp4';
-        const fileName = `${Date.now()}_${title}.${fileExtension}`;
-        const filePath = path.join(DOWNLOADS_DIR, fileName);
+        let cookieFilePath = null;
+        if (browserCookies) {
+            cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
+            let netscapeCookieContent = "# Netscape HTTP Cookie File\n";
+            browserCookies.split(';').forEach(cookie => {
+                const parts = cookie.trim().split('=');
+                if (parts.length >= 2) {
+                    const name = parts[0];
+                    const value = parts.slice(1).join('=');
+                    netscapeCookieContent += `.instagram.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
+                    netscapeCookieContent += `.youtube.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
+                    netscapeCookieContent += `.xvideos.com\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
+                }
+            });
+            fs.writeFileSync(cookieFilePath, netscapeCookieContent);
+        }
 
-        const streamOptions = mode === 'audio' 
-            ? { quality: 'highestaudio' } 
-            : { quality: 'highest' };
+        const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
+        
+        const ytdlArgs = {
+            output: outputTemplate,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+        };
 
-        const stream = ytdl(mediaUrl, streamOptions);
-        const writeStream = fs.createWriteStream(filePath);
+        if (cookieFilePath) {
+            ytdlArgs.cookies = cookieFilePath;
+        }
 
-        stream.pipe(writeStream);
+        if (mode === 'audio') {
+            ytdlArgs.extractAudio = true;
+            ytdlArgs.audioFormat = 'mp3';
+        } else {
+            ytdlArgs.format = 'best[ext=mp4]/best';
+        }
 
-        writeStream.on('finish', () => {
-            const host = req.get('host');
-            const protocol = req.protocol;
-            const downloadToken = `${protocol}://${host}/download/${fileName}`;
-            return res.json({ token: downloadToken, file: fileName });
-        });
+        console.log(`Baixando URL: ${mediaUrl} [Modo: ${mode}]`);
+        
+        await ytdlExec(mediaUrl, ytdlArgs);
+        
+        if (cookieFilePath && fs.existsSync(cookieFilePath)) {
+            fs.unlinkSync(cookieFilePath);
+        }
 
-        stream.on('error', (err) => {
-            console.error("Erro no stream do ytdl:", err);
-            if (!res.headersSent) {
-                return res.status(500).json({ error: "Falha no download.", detail: err.message });
-            }
-        });
+        const files = fs.readdirSync(DOWNLOADS_DIR);
+        const recentFile = files
+            .filter(f => !f.endsWith('.txt'))
+            .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
+            .sort((a, b) => b.time - a.time)[0];
+
+        if (!recentFile) {
+            return res.status(500).json({ error: "Falha ao localizar o arquivo baixado no servidor." });
+        }
+
+        const host = req.get('host');
+        const protocol = req.protocol;
+        const downloadToken = `${protocol}://${host}/download/${recentFile.name}`;
+
+        return res.json({ token: downloadToken, file: recentFile.name });
 
     } catch (err) {
-        console.error("Erro ao obter informações do vídeo:", err);
-        return res.status(500).json({ error: "Erro interno ao processar o vídeo.", detail: err.message });
+        console.error("Erro no processamento do yt-dlp:", err);
+        return res.status(500).json({ error: "Erro ao processar a mídia.", detail: err.message });
     }
 });
 
@@ -101,7 +111,13 @@ app.get('/download/:filename', (req, res) => {
     const filePath = path.join(DOWNLOADS_DIR, filename);
 
     if (fs.existsSync(filePath)) {
-        res.download(filePath, filename);
+        res.download(filePath, filename, (err) => {
+            if (!err) {
+                setTimeout(() => {
+                    try { fs.unlinkSync(filePath); } catch (e) {}
+                }, 10000);
+            }
+        });
     } else {
         res.status(404).json({ error: "Arquivo não encontrado ou expirado." });
     }
@@ -109,5 +125,5 @@ app.get('/download/:filename', (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor Node.js rodando na porta ${PORT}`);
+    console.log(`Servidor Universal rodando na porta ${PORT}`);
 });
