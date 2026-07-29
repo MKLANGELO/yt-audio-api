@@ -10,7 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   let progressInterval;
   let currentProgress = 0;
 
-  // Preenche automaticamente com a URL da aba atual ao abrir o plugin
+  // Preenche automaticamente com a URL atual se o input existir
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tab && tab.url && urlInput) {
@@ -62,14 +62,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       btnDownload.disabled = true;
       btnDownload.style.opacity = "0.6";
 
-      statusEl.innerText = "Processando no servidor...";
+      statusEl.innerText = "Processando Story no servidor...";
       statusEl.style.color = "#a1a1aa";
 
       updateProgress(85, 150);
 
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        let safeTitle = tab && tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
+        let safeTitle = tab && tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "story_baixado";
         let extension = modeSelected === "audio" ? "mp3" : "mp4";
 
         chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
@@ -89,11 +89,10 @@ document.addEventListener("DOMContentLoaded", async () => {
             const errorMsg = data.detail || data.error || "Erro no servidor.";
             
             if (status === 400 && errorMsg.toLowerCase().includes("login")) {
-              let loginUrl = "https://www.youtube.com";
+              let loginUrl = "https://www.facebook.com";
               if (videoUrl.includes("instagram.com")) loginUrl = "https://www.instagram.com";
-              if (videoUrl.includes("facebook.com")) loginUrl = "https://www.facebook.com";
 
-              statusEl.innerText = "Sessão expirada! Abrindo tela de login...";
+              statusEl.innerText = "Sessão expirada para Stories! Abrindo login...";
               statusEl.style.color = "#ffaa00";
               chrome.tabs.create({ url: loginUrl });
               btnDownload.disabled = false;
@@ -123,7 +122,7 @@ document.addEventListener("DOMContentLoaded", async () => {
               btnDownload.style.opacity = "1";
             });
           } else {
-            statusEl.innerText = "❌ Erro ao gerar o link final.";
+            statusEl.innerText = "❌ Erro ao gerar o link final do Story.";
             statusEl.style.color = "#ef4444";
             btnDownload.disabled = false;
             btnDownload.style.opacity = "1";
