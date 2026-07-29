@@ -15,6 +15,8 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
+
+// GARANTIA DE CACHE: Alocado limite pesado de 100MB para payloads no Express
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -22,9 +24,12 @@ const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
 app.post('/', async (req, res) => {
+    // Evita que o Express encerre a conexão prematuramente antes do yt-dlp terminar
+    req.setTimeout(300000); 
+
     const mediaUrl = req.body.url;
     const mode = req.body.mode || 'video';
-    const browserCookies = req.body.cookies; // Recebe o array completo
+    const browserCookies = req.body.cookies;
 
     if (!mediaUrl) return res.status(400).json({ error: "Missing 'url' parameter." });
 
@@ -32,7 +37,6 @@ app.post('/', async (req, res) => {
     try {
         const targetDomain = new URL(mediaUrl).hostname.replace('www.', '');
         
-        // RECONSTRUTOR NETSCAPE: Cria o arquivo idêntico ao antigo sistema
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeCookieContent = "# Netscape HTTP Cookie File\n# https://curl.se/docs/http/cookies.html\n\n";
@@ -52,6 +56,7 @@ app.post('/', async (req, res) => {
 
         const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
         
+        // AUMENTO DE TIMEOUT E RETENTATIVAS (Superando o modelo Python antigo)
         const options = {
             output: outputTemplate,
             noCheckCertificates: true,
@@ -59,7 +64,9 @@ app.post('/', async (req, res) => {
             noPlaylist: true,
             noWarnings: true,
             preferFreeFormats: true,
-            format: 'best[ext=mp4]/best'
+            format: 'best[ext=mp4]/best',
+            socketTimeout: 300,  // 5 Minutos de tolerância para download sem quebrar
+            retries: 30          // 30 tentativas se o host rejeitar
         };
 
         if (cookieFilePath) {
@@ -74,7 +81,7 @@ app.post('/', async (req, res) => {
             }
         }
 
-        console.log(`Extraindo [${targetDomain}] com formato Netscape...`);
+        console.log(`Extraindo [${targetDomain}] com Timeout de 300s...`);
 
         await youtubedl(mediaUrl, options);
 
@@ -98,7 +105,7 @@ app.post('/', async (req, res) => {
             try { fs.unlinkSync(cookieFilePath); } catch(e){}
         }
         console.error("Erro interno yt-dlp:", err.message);
-        return res.status(500).json({ error: "Falha ao extrair a mídia protegida.", detail: err.message });
+        return res.status(500).json({ error: "Falha ao extrair a mídia.", detail: err.message });
     }
 });
 
@@ -115,8 +122,8 @@ app.get('/download/:filename', (req, res) => {
 
 app.use((err, req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
-    res.status(500).json({ error: "Erro interno no servidor Node.", detail: err.message });
+    res.status(500).json({ error: "Erro interno.", detail: err.message });
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Servidor Blindado rodando na porta ${PORT}`));

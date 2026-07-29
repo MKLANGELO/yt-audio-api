@@ -13,7 +13,15 @@
     "*://*.instagram.com/*",
     "*://*.facebook.com/*",
     "*://*.xvideos.com/*",
-    "*://*.alpaclass.com/*"
+    "*://*.alpaclass.com/*",
+    "https://baixatudo-bvx4.onrender.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
   ],
   "background": {
     "service_worker": "background.js"
