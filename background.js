@@ -1,37 +1,47 @@
+// Banco de dados em memória (Cache Interno de Cookies)
+let cookieCache = {};
+
+// Sistema de validação para checar se o usuário está realmente logado
+function validateSession(domain, cookies) {
+  const cookieStr = cookies.map(c => c.name).join(";");
+  if (domain.includes("facebook.com") && !cookieStr.includes("c_user")) return false;
+  if (domain.includes("instagram.com") && !cookieStr.includes("sessionid")) return false;
+  if (domain.includes("youtube.com") && !cookieStr.includes("LOGIN_INFO")) return false;
+  return true; // Se for site público (xvideos, etc), libera
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchMedia") {
-    const cloudApiUrl = "https://baixatudo-bvx4.onrender.com";
-    const mode = request.mode === "video" ? "video" : "audio";
-    const targetUrl = request.url;
+    const urlObj = new URL(request.url);
+    const domain = urlObj.hostname.replace('www.', '');
 
-    let domainMatch = targetUrl.match(/https?:\/\/(?:www\.)?([^/]+)/);
-    let domain = domainMatch ? domainMatch[1] : "";
-
-    if (domain.includes("youtube.com") || domain.includes("youtu.be")) domain = ".youtube.com";
-    else if (domain.includes("instagram.com")) domain = ".instagram.com";
-    else if (domain.includes("facebook.com")) domain = ".facebook.com";
-    else if (domain.includes("xvideos.com")) domain = ".xvideos.com";
-    else if (domain.includes("alpaclass.com")) domain = ".alpaclass.com";
-
-    chrome.cookies.getAll({ domain: domain }, async (cookies) => {
-      let cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join("; ");
-
-      try {
-        const response = await fetch(`${cloudApiUrl}/?url=${encodeURIComponent(targetUrl)}&mode=${mode}`, {
-          method: "GET",
-          headers: {
-            "Accept": "application/json",
-            "X-Browser-Cookies": cookieHeader
-          }
-        });
-
-        const data = await response.json();
-        sendResponse({ success: true, responseOk: response.ok, status: response.status, data: data });
-      } catch (error) {
-        sendResponse({ success: false, error: error.message });
+    // Busca os logs/cookies diretamente dentro da aba do navegador
+    chrome.cookies.getAll({ domain: domain }, (cookies) => {
+      
+      // Verifica se está logado antes de tentar baixar e travar o servidor
+      if (!validateSession(domain, cookies)) {
+         sendResponse({ 
+           success: true, 
+           responseOk: false, 
+           status: 400, 
+           data: { error: `Você não está logado no ${domain}. Faça o login na aba primeiro.` } 
+         });
+         return;
       }
-    });
 
-    return true;
+      // Formata e salva os logs do cliente no cache interno
+      let cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+      cookieCache[domain] = cookieHeader;
+
+      // Envia requisição para a API com o cache validado
+      fetch(`https://baixatudo-bvx4.onrender.com/?url=${encodeURIComponent(request.url)}&mode=${request.mode}`, {
+        method: 'GET',
+        headers: { 'X-Browser-Cookies': cookieCache[domain] }
+      })
+      .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))
+      .then(result => sendResponse({ success: true, responseOk: result.ok, status: result.status, data: result.data }))
+      .catch(err => sendResponse({ success: false, error: err.message }));
+    });
+    return true; // Mantém o canal de comunicação aberto
   }
 });
