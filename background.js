@@ -8,10 +8,27 @@ function validateSession(domain, cookies) {
   return true;
 }
 
+// Função para limpar rastreadores da URL que quebram o download
+function cleanUrl(rawUrl) {
+  try {
+    let urlObj = new URL(rawUrl);
+    // Se for Face ou Insta, corta tudo que vem depois do "?" (rastreadores)
+    if (urlObj.hostname.includes('facebook.com') || urlObj.hostname.includes('instagram.com')) {
+       return rawUrl.split('?')[0]; 
+    }
+    return rawUrl; // Mantém YouTube e Xvideos intactos
+  } catch(e) {
+    return rawUrl;
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "fetchMedia") {
     const urlObj = new URL(request.url);
     const domain = urlObj.hostname.replace('www.', '');
+    
+    // Passa a URL pelo limpador
+    const urlLimpa = cleanUrl(request.url);
 
     chrome.cookies.getAll({ domain: domain }, (cookies) => {
       
@@ -28,12 +45,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       let cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
       cookieCache[domain] = cookieHeader;
 
-      // Mudança crítica: Usando POST para suportar cookies gigantes no Body
       fetch(`https://baixatudo-bvx4.onrender.com/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            url: request.url,
+            url: urlLimpa, // Envia a URL limpa pro servidor
             mode: request.mode,
             cookies: cookieCache[domain]
         })
