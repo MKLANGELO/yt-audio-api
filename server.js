@@ -4,6 +4,7 @@ const youtubedl = require('youtube-dl-exec');
 const path = require('path');
 const fs = require('fs');
 const ffmpegPath = require('ffmpeg-static');
+const { execSync } = require('child_process');
 
 const app = express();
 app.use(cors());
@@ -26,6 +27,16 @@ function cleanOldFiles() {
         });
     } catch(e) {}
 }
+
+app.get('/disk', (req, res) => {
+    try {
+        const dfOutput = execSync('df -h /').toString();
+        const lines = dfOutput.trim().split('\n');
+        return res.json({ success: true, diskUsage: lines });
+    } catch (err) {
+        return res.status(500).json({ error: "Erro ao ler espaço em disco.", detail: err.message });
+    }
+});
 
 function sanitizeUrl(inputUrl) {
     try {
@@ -53,10 +64,22 @@ async function processMedia(req, res, isRecordMode = false) {
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
+    // Bloqueia URLs raiz/home que nao apontam para midias especificas
+    if (
+        mediaUrl === "https://www.facebook.com/" || 
+        mediaUrl.match(/^https:\/\/www\.facebook\.com\/[^\/]+\/?$/) ||
+        mediaUrl === "https://www.tiktok.com/" ||
+        mediaUrl === "https://www.tiktok.com/pt-BR" ||
+        mediaUrl === "https://www.tiktok.com/pt-BR/" ||
+        mediaUrl.match(/^https:\/\/www\.tiktok\.com\/(@[^\/]+)?\/?$/)
+    ) {
+        return res.status(400).json({ error: "URL inválida. Abra uma postagem, reel ou vídeo específico do TikTok/Facebook." });
+    }
+
     let cookieFilePath = null;
     try {
         const urlObj = new URL(mediaUrl);
-        const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
+        const targetDomain = urlObj.hostname.replace('www.', '');
 
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${isRecordMode ? 'rec_' : ''}${Date.now()}.txt`);
@@ -105,7 +128,7 @@ async function processMedia(req, res, isRecordMode = false) {
             ];
         }
 
-        console.log(`[CONVERT ENGINE] Processando [${targetDomain}] | Modo: ${mode} | Conversão Forçada Ativa | URL: ${mediaUrl}`);
+        console.log(`[CONVERT ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
@@ -124,7 +147,7 @@ async function processMedia(req, res, isRecordMode = false) {
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         console.error("[CONVERT ERROR]", err.message);
-        return res.status(500).json({ error: "Falha na conversão e extração de mídia.", detail: err.message });
+        return res.status(500).json({ error: "Falha na conversão e extração de mídia. Certifique-se de usar o link direto do vídeo.", detail: err.message });
     }
 }
 
@@ -141,7 +164,7 @@ app.get('/download/:filename', (req, res) => {
                 try {
                     if (fs.existsSync(filePath)) {
                         fs.unlinkSync(filePath);
-                        console.log(`[CACHE CLEAN] Arquivo convertido removido do servidor: ${filename}`);
+                        console.log(`[CACHE CLEAN] Arquivo removido do servidor: ${filename}`);
                     }
                 } catch(e){}
             }, 2000);
