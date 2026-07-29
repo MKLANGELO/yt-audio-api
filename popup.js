@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btnDownload.disabled = true;
       btnDownload.style.opacity = "0.6";
 
-      statusEl.innerText = "Procurando player ativo na tela...";
+      statusEl.innerText = "Rastreando player ativo...";
       statusEl.style.color = "#a1a1aa";
 
       updateProgress(85, 150);
@@ -52,28 +52,26 @@ document.addEventListener("DOMContentLoaded", () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         
-        // Pede ao content.js a URL exata do que está tocando agora
         chrome.tabs.sendMessage(tab.id, { action: "getPlayingMedia" }, (response) => {
             
-            // Se o script responder com a URL rastreada, usa ela. Senão, usa a url geral da aba.
             let videoUrl = (response && response.url) ? response.url : (tab ? tab.url : "");
 
-            // Bloqueio inteligente: se ele não achou nada e tá na página inicial
+            // A MÁGICA DE PREVENÇÃO DE ERROS ACONTECE AQUI
+            // Se a URL final for a página inicial, nós travamos a operação e ensinamos o usuário.
             if (!videoUrl || videoUrl === "https://www.facebook.com/" || videoUrl === "https://www.instagram.com/") {
               clearInterval(progressInterval);
-              statusEl.innerText = "❌ Nenhum vídeo tocando! Dê play no vídeo e tente novamente.";
-              statusEl.style.color = "#ffaa00";
+              statusEl.innerText = "⚠️ Clique para abrir o vídeo em tela cheia antes de baixar!";
+              statusEl.style.color = "#FF8C00"; // Laranja de aviso
               btnDownload.disabled = false;
               btnDownload.style.opacity = "1";
               return;
             }
 
-            statusEl.innerText = "Enviando mídia ativa pro servidor...";
+            statusEl.innerText = "Enviando pro servidor (pode levar alguns minutos)...";
 
             let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
             let extension = modeSelected === "audio" ? "mp3" : "mp4";
 
-            // Envia para o motor baixar!
             chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, async (res) => {
               clearInterval(progressInterval);
 
@@ -136,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } catch (err) {
         clearInterval(progressInterval);
         console.error("Erro:", err);
-        statusEl.innerText = "❌ Erro inesperado.";
+        statusEl.innerText = "❌ Erro inesperado. Recarregue a página.";
         statusEl.style.color = "#ef4444";
         btnDownload.disabled = false;
         btnDownload.style.opacity = "1";
