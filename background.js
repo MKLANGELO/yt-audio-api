@@ -8,15 +8,13 @@ function validateSession(domain, cookies) {
   return true;
 }
 
-// Função para limpar rastreadores da URL que quebram o download
 function cleanUrl(rawUrl) {
   try {
     let urlObj = new URL(rawUrl);
-    // Se for Face ou Insta, corta tudo que vem depois do "?" (rastreadores)
     if (urlObj.hostname.includes('facebook.com') || urlObj.hostname.includes('instagram.com')) {
        return rawUrl.split('?')[0]; 
     }
-    return rawUrl; // Mantém YouTube e Xvideos intactos
+    return rawUrl;
   } catch(e) {
     return rawUrl;
   }
@@ -27,7 +25,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const urlObj = new URL(request.url);
     const domain = urlObj.hostname.replace('www.', '');
     
-    // Passa a URL pelo limpador
     const urlLimpa = cleanUrl(request.url);
 
     chrome.cookies.getAll({ domain: domain }, (cookies) => {
@@ -42,14 +39,20 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          return;
       }
 
-      let cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+      // MODIFICAÇÃO: Só injeta os cookies se for rede social restrita.
+      // Sites como XVideos vão sem cookies para não ativar o Firewall/Geo-block.
+      let cookieHeader = "";
+      if (domain.includes("facebook.com") || domain.includes("instagram.com") || domain.includes("youtube.com")) {
+          cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+      }
+      
       cookieCache[domain] = cookieHeader;
 
       fetch(`https://baixatudo-bvx4.onrender.com/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            url: urlLimpa, // Envia a URL limpa pro servidor
+            url: urlLimpa,
             mode: request.mode,
             cookies: cookieCache[domain]
         })
