@@ -2,137 +2,34 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Universal Media Downloader</title>
+    <title>Media Downloader</title>
     <style>
-        body {
-            width: 320px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #18181b;
-            color: #f4f4f5;
-            margin: 0;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        h3 {
-            font-size: 18px;
-            margin-top: 0;
-            text-align: center;
-            color: #10b981;
-            font-weight: 600;
-        }
-        .options-container {
-            background: #27272a;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border: 1px solid #3f3f46;
-        }
-        .url-input-container {
-            margin-bottom: 12px;
-        }
-        .url-input-container input {
-            width: 100%;
-            padding: 8px;
-            background: #18181b;
-            border: 1px solid #3f3f46;
-            border-radius: 4px;
-            color: #f4f4f5;
-            font-size: 12px;
-            box-sizing: border-box;
-        }
-        .format-options {
-            display: flex;
-            justify-content: space-around;
-            margin-bottom: 12px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid #3f3f46;
-        }
-        .checkbox-option {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #d4d4d8;
-        }
-        label {
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background: #10b981;
-            color: #ffffff;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        button:hover { background: #059669; }
-        #progress-container {
-            width: 100%;
-            background: #3f3f46;
-            border-radius: 6px;
-            margin-top: 15px;
-            height: 16px;
-            overflow: hidden;
-            display: none;
-            position: relative;
-        }
-        #progress-bar {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #10b981, #34d399);
-            transition: width 0.3s ease;
-        }
-        #progress-text {
-            position: absolute;
-            width: 100%;
-            text-align: center;
-            font-size: 11px;
-            font-weight: bold;
-            color: #ffffff;
-            line-height: 16px;
-        }
-        #status {
-            font-size: 13px;
-            margin-top: 12px;
-            text-align: center;
-            color: #a1a1aa;
-            word-break: break-word;
-            min-height: 18px;
-        }
+        body { width: 300px; font-family: Arial, sans-serif; padding: 10px; background: #121212; color: #fff; margin: 0; }
+        h3 { font-size: 14px; margin-bottom: 8px; color: #10b981; text-align: center; }
+        input[type="text"] { width: 100%; padding: 6px; box-sizing: border-box; background: #1e1e1e; border: 1px solid #333; color: #fff; border-radius: 4px; margin-bottom: 8px; }
+        .modes { display: flex; justify-content: space-around; margin-bottom: 8px; font-size: 12px; }
+        button { width: 100%; padding: 8px; background: #10b981; border: none; color: #fff; font-weight: bold; border-radius: 4px; cursor: pointer; margin-top: 4px; }
+        button.record { background: #ef4444; }
+        button:hover { opacity: 0.9; }
+        #status { font-size: 11px; margin-top: 8px; text-align: center; color: #a1a1aa; }
+        #progress-container { width: 100%; background: #222; border-radius: 4px; margin-top: 8px; display: none; height: 6px; overflow: hidden; }
+        #progress-bar { width: 0%; height: 100%; background: #10b981; transition: width 0.2s; }
     </style>
 </head>
 <body>
-    <h3>Media Downloader</h3>
+    <h3>Media Downloader & Sniffer</h3>
+    <input type="text" id="media-url" placeholder="URL da mídia...">
     
-    <div class="options-container">
-        <div class="url-input-container">
-            <input type="text" id="media-url" placeholder="Cole a URL do vídeo aqui ou use a aba atual">
-        </div>
-        <div class="format-options">
-            <label><input type="radio" name="mode" value="video" checked> 🎬 Vídeo</label>
-            <label><input type="radio" name="mode" value="audio"> 🎵 Áudio</label>
-        </div>
-        <div class="checkbox-option">
-            <input type="checkbox" id="ask-folder" checked>
-            <label for="ask-folder">Escolher pasta ao baixar</label>
-        </div>
+    <div class="modes">
+        <label><input type="radio" name="mode" value="video" checked> Vídeo</label>
+        <label><input type="radio" name="mode" value="audio"> Áudio</label>
+        <label><input type="checkbox" id="ask-folder" checked> Salvar como...</label>
     </div>
 
-    <button id="btn-download">Iniciar Download</button>
-    
-    <div id="progress-container">
-        <div id="progress-text">0%</div>
-        <div id="progress-bar"></div>
-    </div>
+    <button id="btn-download">Iniciar Download (Servidor)</button>
+    <button id="btn-record" class="record">🔴 Gravar Stream da Tela (Local)</button>
+
+    <div id="progress-container"><div id="progress-bar"></div></div>
     <div id="status">Pronto para iniciar.</div>
 
     <script src="popup.js"></script>
