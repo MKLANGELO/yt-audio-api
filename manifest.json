@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Universal Media Downloader",
-  "version": "1.0",
-  "description": "Baixe vídeos e áudios de qualquer plataforma suportada.",
+  "version": "2.0",
+  "description": "Baixe vídeos via servidor ou grave streams protegidos.",
   "permissions": [
     "activeTab",
     "cookies",
@@ -13,7 +13,8 @@
     "<all_urls>"
   ],
   "action": {
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
   },
   "background": {
     "service_worker": "background.js"

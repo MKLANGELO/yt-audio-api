@@ -18,28 +18,3 @@ function blockPause() {
     });
 }
 setInterval(blockPause, 1000);
-
-// Rastreador avançado focado em players protegidos (AlpaClass, etc)
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "getPlayingMedia") {
-        const videoElement = document.querySelector('video');
-        if (videoElement) {
-            // Se o player estiver usando blob ou link direto interno do player
-            if (videoElement.src && !videoElement.src.startsWith('blob:')) {
-                sendResponse({ url: videoElement.src });
-                return true;
-            }
-            
-            // Tenta varrer iframes ou fontes alternativas do player protegido
-            const sourceElements = document.querySelectorAll('video source');
-            for (let srcEl of sourceElements) {
-                if (srcEl.src) {
-                    sendResponse({ url: srcEl.src });
-                    return true;
-                }
-            }
-        }
-        sendResponse({ url: window.location.href });
-    }
-    return true;
-});

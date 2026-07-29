@@ -28,6 +28,52 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, speedMs);
   }
 
+  if (btnDownload) {
+    btnDownload.onclick = async (e) => {
+      e.preventDefault();
+      const videoUrl = urlInput ? urlInput.value.trim() : "";
+      if (!videoUrl) { statusEl.innerText = "❌ Insira uma URL!"; return; }
+
+      const modeSelected = document.querySelector('input[name="mode"]:checked').value;
+      const shouldAskFolder = document.getElementById("ask-folder").checked;
+
+      currentProgress = 0;
+      if (progressContainer) progressContainer.style.display = "block";
+      if (progressBar) progressBar.style.width = "0%";
+
+      btnDownload.disabled = true;
+      btnDownload.style.opacity = "0.6";
+      statusEl.innerText = "Processando no servidor...";
+
+      updateProgress(85, 150);
+
+      chrome.runtime.sendMessage({ action: "fetchMedia", url: videoUrl, mode: modeSelected }, (res) => {
+        clearInterval(progressInterval);
+
+        if (!res || !res.success || !res.responseOk) {
+          statusEl.innerText = "❌ Falha no servidor. Tente usar o botão vermelho 🔴";
+          btnDownload.disabled = false;
+          btnDownload.style.opacity = "1";
+          return;
+        }
+
+        if (res.data && res.data.token) {
+          if (progressBar) progressBar.style.width = "100%";
+          statusEl.innerText = "✅ Baixando arquivo...";
+          chrome.downloads.download({
+            url: res.data.token,
+            filename: res.data.file,
+            saveAs: shouldAskFolder
+          }, () => {
+            statusEl.innerText = "✅ Concluído!";
+            btnDownload.disabled = false;
+            btnDownload.style.opacity = "1";
+          });
+        }
+      });
+    };
+  }
+
   if (btnRecord) {
     btnRecord.onclick = async (e) => {
       e.preventDefault();
