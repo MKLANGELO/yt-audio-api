@@ -9,14 +9,13 @@ document.addEventListener("DOMContentLoaded", () => {
   let progressInterval;
   let currentProgress = 0;
 
-  // Função para simular o progresso em porcentagem
   function updateProgress(targetPercentage, speedMs) {
     clearInterval(progressInterval);
     progressInterval = setInterval(() => {
       if (currentProgress < targetPercentage) {
         currentProgress++;
-        progressBar.style.width = currentProgress + "%";
-        progressText.innerText = currentProgress + "%";
+        if (progressBar) progressBar.style.width = currentProgress + "%";
+        if (progressText) progressText.innerText = currentProgress + "%";
       } else {
         clearInterval(progressInterval);
       }
@@ -33,14 +32,15 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      const modeSelected = document.querySelector('input[name="mode"]:checked').value;
-      const shouldAskFolder = askFolderCheckbox.checked;
+      // Proteção extra caso o HTML não carregue as opções
+      const modeInput = document.querySelector('input[name="mode"]:checked');
+      const modeSelected = modeInput ? modeInput.value : "video";
+      const shouldAskFolder = askFolderCheckbox ? askFolderCheckbox.checked : true;
 
-      // Reseta e exibe a barra
       currentProgress = 0;
-      progressContainer.style.display = "block";
-      progressBar.style.width = "0%";
-      progressText.innerText = "0%";
+      if (progressContainer) progressContainer.style.display = "block";
+      if (progressBar) progressBar.style.width = "0%";
+      if (progressText) progressText.innerText = "0%";
       
       btnDownload.disabled = true;
       btnDownload.style.opacity = "0.6";
@@ -48,7 +48,6 @@ document.addEventListener("DOMContentLoaded", () => {
       statusEl.innerText = "Processando mídia no servidor...";
       statusEl.style.color = "#a1a1aa";
 
-      // Inicia a animação até 85% enquanto aguarda o servidor processar
       updateProgress(85, 150);
 
       try {
@@ -82,6 +81,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (!responseOk) {
             const errorMsg = data.detail || data.error || "Erro no servidor.";
+            
+            // SISTEMA ANTIGO RESTAURADO: Redireciona caso o login falhe
+            if (status === 400 && errorMsg.toLowerCase().includes("login")) {
+              let loginUrl = "https://www.youtube.com";
+              if (videoUrl.includes("instagram.com")) loginUrl = "https://www.instagram.com";
+              if (videoUrl.includes("facebook.com")) loginUrl = "https://www.facebook.com";
+
+              statusEl.innerText = "Sessão expirada! Abrindo tela de login...";
+              statusEl.style.color = "#ffaa00";
+
+              chrome.tabs.create({ url: loginUrl });
+              btnDownload.disabled = false;
+              btnDownload.style.opacity = "1";
+              return;
+            }
+
             statusEl.innerText = "❌ Erro: " + errorMsg;
             statusEl.style.color = "#ef4444";
             btnDownload.disabled = false;
@@ -90,7 +105,6 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           if (data && data.token) {
-            // Acelera de 85% para 100%
             updateProgress(100, 20);
             
             statusEl.innerText = shouldAskFolder 
@@ -98,11 +112,10 @@ document.addEventListener("DOMContentLoaded", () => {
               : "Iniciando download...";
             statusEl.style.color = "#10b981";
 
-            // Dispara o download nativo do navegador
             chrome.downloads.download({
               url: data.token,
               filename: `${safeTitle}.${extension}`,
-              saveAs: shouldAskFolder // Abre a caixa de selecionar pasta se marcado
+              saveAs: shouldAskFolder
             }, () => {
               statusEl.innerText = "✅ Concluído!";
               btnDownload.disabled = false;
