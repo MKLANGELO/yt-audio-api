@@ -2,38 +2,27 @@
   "manifest_version": 3,
   "name": "Universal Media Downloader",
   "version": "1.0",
+  "description": "Baixe vídeos e áudios de qualquer plataforma suportada.",
   "permissions": [
     "activeTab",
+    "cookies",
     "downloads",
-    "tabs",
-    "cookies"
+    "tabs"
   ],
   "host_permissions": [
-    "*://*.youtube.com/*",
-    "*://*.instagram.com/*",
-    "*://*.facebook.com/*",
-    "*://*.xvideos.com/*",
-    "*://*.alpaclass.com/*",
-    "https://baixatudo-bvx4.onrender.com/*"
+    "<all_urls>"
   ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_start",
-      "world": "MAIN" 
+      "run_at": "document_end"
     }
-  ],
-  "background": {
-    "service_worker": "background.js"
-  },
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": "icon.png"
-  },
-  "icons": {
-    "16": "icon.png",
-    "48": "icon.png",
-    "128": "icon.png"
-  }
+  ]
 }
