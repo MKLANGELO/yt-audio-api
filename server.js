@@ -74,9 +74,14 @@ app.post('/', async (req, res) => {
             options.cookies = cookieFilePath;
         }
 
-        // Ajustes assertivos por ecossistema
+        // Configuração ultra-resistente para o YouTube e Shorts
         if (targetDomain.includes('youtube.com')) {
-            options.extractorArgs = 'youtube:player_client=android,web';
+            options.extractorArgs = 'youtube:player_client=mweb,ios,web';
+            options.addHeader = [
+                'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+                'Accept-Language: pt-BR,pt;q=0.9',
+                'Referer: https://www.youtube.com/'
+            ];
         } else if (targetDomain.includes('facebook.com')) {
             if (mediaUrl.includes('/stories/')) {
                 options.addHeader = [
@@ -110,7 +115,7 @@ app.post('/', async (req, res) => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_` ) && !f.endsWith('.txt') && !f.endsWith('.part'));
+        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
         if (!generatedFile) {
             throw new Error("O motor não conseguiu consolidar o arquivo de mídia no disco.");
