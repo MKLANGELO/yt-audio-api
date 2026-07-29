@@ -24,7 +24,7 @@ if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true
 app.post('/', async (req, res) => {
     const mediaUrl = req.body.url;
     const mode = req.body.mode || 'video';
-    const browserCookies = req.body.cookies;
+    const browserCookies = req.body.cookies; // Recebe o array completo
 
     if (!mediaUrl) return res.status(400).json({ error: "Missing 'url' parameter." });
 
@@ -32,59 +32,52 @@ app.post('/', async (req, res) => {
     try {
         const targetDomain = new URL(mediaUrl).hostname.replace('www.', '');
         
-        // RECRIANDO O SISTEMA DO PYTHON: Gera um arquivo Netscape temporário
-        if (browserCookies && browserCookies.trim() !== "") {
+        // RECONSTRUTOR NETSCAPE: Cria o arquivo idêntico ao antigo sistema
+        if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
-            let netscapeCookieContent = "# Netscape HTTP Cookie File\n";
-            browserCookies.split(';').forEach(cookie => {
-                const parts = cookie.trim().split('=');
-                if (parts.length >= 2) {
-                    const name = parts.shift();
-                    const value = parts.join('=');
-                    netscapeCookieContent += `.${targetDomain}\tTRUE\t/\tFALSE\t2147483647\t${name}\t${value}\n`;
-                }
+            let netscapeCookieContent = "# Netscape HTTP Cookie File\n# https://curl.se/docs/http/cookies.html\n\n";
+            
+            browserCookies.forEach(c => {
+                let domain = c.domain;
+                if (!domain.startsWith('.')) domain = '.' + domain;
+                const includeSubDomains = 'TRUE';
+                const pathUrl = c.path || '/';
+                const secure = c.secure ? 'TRUE' : 'FALSE';
+                const expiry = c.expirationDate ? Math.floor(c.expirationDate) : 2147483647;
+
+                netscapeCookieContent += `${domain}\t${includeSubDomains}\t${pathUrl}\t${secure}\t${expiry}\t${c.name}\t${c.value}\n`;
             });
             fs.writeFileSync(cookieFilePath, netscapeCookieContent);
         }
 
         const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
         
-        // CONFIGURAÇÕES IDÊNTICAS AO SEU SISTEMA PYTHON ANTIGO
         const options = {
             output: outputTemplate,
-            noCheckCertificates: true, 
-            geoBypass: true,           
-            noPlaylist: true,          
+            noCheckCertificates: true,
+            geoBypass: true,
+            noPlaylist: true,
             noWarnings: true,
             preferFreeFormats: true,
             format: 'best[ext=mp4]/best'
         };
 
-        // CORREÇÃO CRÍTICA DO YOUTUBE E INJEÇÃO DO CACHE DE COOKIES
         if (cookieFilePath) {
             options.cookies = cookieFilePath;
             if (targetDomain.includes('youtube')) {
-                // Força o YouTube a usar o cliente Web padrão, impedindo o bloqueio de cookies randômicos
                 options.extractorArgs = 'youtube:player_client=web'; 
             } else {
                 options.addHeader = [
-                    'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+                    'User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     `Referer: https://www.${targetDomain}/`
                 ];
             }
         }
 
-        if (mode === 'audio') {
-            options.extractAudio = true;
-            options.audioFormat = 'mp3';
-            delete options.format;
-        }
-
-        console.log(`Processando [${targetDomain}] com cache nativo: ${mediaUrl}`);
+        console.log(`Extraindo [${targetDomain}] com formato Netscape...`);
 
         await youtubedl(mediaUrl, options);
 
-        // Limpeza imediata do arquivo de cache de segurança
         if (cookieFilePath && fs.existsSync(cookieFilePath)) {
             try { fs.unlinkSync(cookieFilePath); } catch(e){}
         }
@@ -104,8 +97,8 @@ app.post('/', async (req, res) => {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) {
             try { fs.unlinkSync(cookieFilePath); } catch(e){}
         }
-        console.error("Erro interno:", err.message);
-        return res.status(500).json({ error: "Falha ao extrair a mídia.", detail: err.message });
+        console.error("Erro interno yt-dlp:", err.message);
+        return res.status(500).json({ error: "Falha ao extrair a mídia protegida.", detail: err.message });
     }
 });
 

@@ -1,4 +1,3 @@
-// Memória Cache Interna
 let cookieCache = {};
 
 function validateSession(domain, cookies) {
@@ -12,7 +11,6 @@ function validateSession(domain, cookies) {
 function cleanUrl(rawUrl) {
   try {
     let urlObj = new URL(rawUrl);
-    // Removemos o parâmetro de playlist do youtube para imitar o "no_playlist: True" do python
     if (urlObj.hostname.includes('youtube.com') && urlObj.searchParams.has('v')) {
         return `https://www.youtube.com/watch?v=${urlObj.searchParams.get('v')}`;
     }
@@ -31,7 +29,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const domain = urlObj.hostname.replace('www.', '');
     const urlLimpa = cleanUrl(request.url);
 
-    // Busca os logs do cliente diretamente do navegador
     chrome.cookies.getAll({ domain: domain }, (cookies) => {
       
       if (!validateSession(domain, cookies)) {
@@ -44,13 +41,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
          return;
       }
 
-      let cookieHeader = "";
-      if (domain.includes("facebook.com") || domain.includes("instagram.com") || domain.includes("youtube.com")) {
-          cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+      // NOVIDADE: Em vez de texto, enviamos o ARRAY COMPLETO de objetos de cookies
+      let cookiesToUse = [];
+      if (domain.includes("facebook.com") || domain.includes("instagram.com") || domain.includes("youtube.com") || domain.includes("xvideos.com")) {
+          cookiesToUse = cookies;
       }
       
-      // Salva no cache interno em memória
-      cookieCache[domain] = cookieHeader;
+      cookieCache[domain] = cookiesToUse;
 
       fetch(`https://baixatudo-bvx4.onrender.com/`, {
         method: 'POST',
@@ -58,7 +55,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         body: JSON.stringify({
             url: urlLimpa,
             mode: request.mode,
-            cookies: cookieCache[domain]
+            cookies: cookieCache[domain] // Envia os dados ricos para o servidor reconstruir
         })
       })
       .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))
