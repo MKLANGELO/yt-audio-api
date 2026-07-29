@@ -56,17 +56,17 @@ document.addEventListener("DOMContentLoaded", () => {
             
             let videoUrl = (response && response.url) ? response.url : (tab ? tab.url : "");
 
-            // Se o rastreador profundo falhar (muito raro agora), ele ensina a abrir o post, e não a tela cheia.
+            // Trava de segurança apenas se não achar absolutamente nada. Mensagem de erro simples restaurada.
             if (!videoUrl || videoUrl === "https://www.facebook.com/" || videoUrl === "https://www.instagram.com/") {
               clearInterval(progressInterval);
-              statusEl.innerText = "⚠️ Vídeo oculto. Clique no TÍTULO ou na DATA do post para abri-lo e tente novamente.";
-              statusEl.style.color = "#FF8C00";
+              statusEl.innerText = "❌ Nenhum player ativo detectado. Dê play no vídeo e tente novamente.";
+              statusEl.style.color = "#ef4444"; 
               btnDownload.disabled = false;
               btnDownload.style.opacity = "1";
               return;
             }
 
-            statusEl.innerText = "Enviando pro servidor...";
+            statusEl.innerText = "Enviando pro servidor (pode levar alguns minutos)...";
 
             let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
             let extension = modeSelected === "audio" ? "mp3" : "mp4";
