@@ -58,7 +58,6 @@ async function processMedia(req, res, isRecordMode = false) {
         const urlObj = new URL(mediaUrl);
         const targetDomain = urlObj.hostname.includes('youtube.com') ? 'youtube.com' : urlObj.hostname.replace('www.', '');
 
-        // Passa os cookies do navegador para burlar a exigência de login / bot do YouTube
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${isRecordMode ? 'rec_' : ''}${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
@@ -80,12 +79,23 @@ async function processMedia(req, res, isRecordMode = false) {
             noWarnings: true,
             ffmpegLocation: ffmpegPath,
             socketTimeout: 300,
-            retries: 30,
-            format: isRecordMode ? (mode === 'audio' ? 'bestaudio/best' : 'best[ext=mp4]/best') : (mode === 'audio' ? 'bestaudio/best' : 'best/bestvideo+bestaudio')
+            retries: 30
         };
 
         if (cookieFilePath) {
             options.cookies = cookieFilePath;
+        }
+
+        // Força conversão e normalização rigorosa de formato e tipo de arquivo
+        if (mode === 'audio') {
+            options.extractAudio = true;
+            options.audioFormat = 'mp3';
+            options.audioQuality = 0;
+            options.format = 'bestaudio/best';
+        } else {
+            // Se for gravação/stream, força conversão estrita para mp4 universal via ffmpeg
+            options.format = 'bestvideo+bestaudio/best';
+            options.mergeOutputFormat = 'mp4';
         }
 
         if (targetDomain.includes('youtube.com')) {
@@ -97,13 +107,7 @@ async function processMedia(req, res, isRecordMode = false) {
             ];
         }
 
-        if (mode === 'audio' && !isRecordMode) {
-            options.extractAudio = true;
-            options.audioFormat = 'mp3';
-            options.audioQuality = 0;
-        }
-
-        console.log(`[ENGINE] Processando [${targetDomain}] (${isRecordMode ? 'Stream Record' : 'Standard'}) | URL: ${mediaUrl}`);
+        console.log(`[CONVERT ENGINE] Processando [${targetDomain}] | Modo: ${mode} | Conversão Forçada Ativa | URL: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
@@ -113,7 +117,7 @@ async function processMedia(req, res, isRecordMode = false) {
         const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
         if (!generatedFile) {
-            throw new Error("O motor não conseguiu consolidar o arquivo no disco.");
+            throw new Error("O motor não conseguiu consolidar ou converter o arquivo no disco.");
         }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
@@ -121,8 +125,8 @@ async function processMedia(req, res, isRecordMode = false) {
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        console.error("[ENGINE ERROR]", err.message);
-        return res.status(500).json({ error: "Falha na extração. O YouTube pode estar exigindo verificação na conta.", detail: err.message });
+        console.error("[CONVERT ERROR]", err.message);
+        return res.status(500).json({ error: "Falha na conversão e extração de mídia.", detail: err.message });
     }
 }
 
@@ -139,7 +143,7 @@ app.get('/download/:filename', (req, res) => {
                 try {
                     if (fs.existsSync(filePath)) {
                         fs.unlinkSync(filePath);
-                        console.log(`[CACHE CLEAN] Arquivo removido: ${filename}`);
+                        console.log(`[CACHE CLEAN] Arquivo convertido removido do servidor: ${filename}`);
                     }
                 } catch(e){}
             }, 2000);
@@ -149,4 +153,4 @@ app.get('/download/:filename', (req, res) => {
     }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Motor Profissional Ativo."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor de Conversão e Mídia Ativo."));
