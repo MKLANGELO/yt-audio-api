@@ -10,7 +10,7 @@ function blockPause() {
             v.dataset.pauseBlocked = "true";
             const originalPause = v.pause;
             v.pause = function() {
-                if (!document.hasFocus()) return;
+                if (!document.hasFocus()) return; 
                 return originalPause.apply(this, arguments);
             };
         }
@@ -24,36 +24,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const playingMedia = mediaElements.find(m => !m.paused && !m.ended && m.readyState > 0);
 
         if (playingMedia) {
-            // Se o link for direto e limpo
             if (playingMedia.src && !playingMedia.src.startsWith('blob:')) {
                 sendResponse({ url: playingMedia.src });
                 return true;
             }
 
-            // O Facebook esconde os links reais em atributos href próximos ao player. Vamos procurar.
+            // RASTREADOR PROFUNDO: Varre a estrutura do Facebook Feed para achar a ID do post ativo
             let currentElement = playingMedia;
             let foundUrl = null;
-            const linkRegex = /\/(watch|reel|reels|p|videos|stories|permalink)\//;
+            const linkRegex = /\/(watch|reel|reels|videos|permalink|posts)\/|fbid=/;
 
-            for (let i = 0; i < 15; i++) {
+            // Sobe até 20 níveis na caixa do post procurando o link original
+            for (let i = 0; i < 20; i++) {
                 if (!currentElement) break;
                 
-                // Procura na tag A
-                if (currentElement.tagName === 'A' && currentElement.href && currentElement.href.match(linkRegex)) {
-                    foundUrl = currentElement.href;
-                    break;
-                }
-
-                // Procura nos links filhos da caixa do post
                 const links = currentElement.querySelectorAll('a[href]');
                 for (let a of Array.from(links)) {
-                    if (a.href.match(linkRegex)) {
-                        foundUrl = a.href;
+                    let href = a.href;
+                    if (href.match(linkRegex)) {
+                        foundUrl = href;
                         break;
                     }
                 }
                 if (foundUrl) break;
-                currentElement = currentElement.parentElement; // Sobe um nível no HTML
+                currentElement = currentElement.parentElement;
             }
 
             sendResponse({ url: foundUrl || window.location.href });

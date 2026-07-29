@@ -56,18 +56,17 @@ document.addEventListener("DOMContentLoaded", () => {
             
             let videoUrl = (response && response.url) ? response.url : (tab ? tab.url : "");
 
-            // A MÁGICA DE PREVENÇÃO DE ERROS ACONTECE AQUI
-            // Se a URL final for a página inicial, nós travamos a operação e ensinamos o usuário.
+            // Se o rastreador profundo falhar (muito raro agora), ele ensina a abrir o post, e não a tela cheia.
             if (!videoUrl || videoUrl === "https://www.facebook.com/" || videoUrl === "https://www.instagram.com/") {
               clearInterval(progressInterval);
-              statusEl.innerText = "⚠️ Clique para abrir o vídeo em tela cheia antes de baixar!";
-              statusEl.style.color = "#FF8C00"; // Laranja de aviso
+              statusEl.innerText = "⚠️ Vídeo oculto. Clique no TÍTULO ou na DATA do post para abri-lo e tente novamente.";
+              statusEl.style.color = "#FF8C00";
               btnDownload.disabled = false;
               btnDownload.style.opacity = "1";
               return;
             }
 
-            statusEl.innerText = "Enviando pro servidor (pode levar alguns minutos)...";
+            statusEl.innerText = "Enviando pro servidor...";
 
             let safeTitle = tab.title ? tab.title.replace(/[<>:"/\\|?*]+/g, "").trim().substring(0, 80) : "midia_baixada";
             let extension = modeSelected === "audio" ? "mp3" : "mp4";
