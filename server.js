@@ -46,7 +46,10 @@ app.post('/', async (req, res) => {
         const urlObj = new URL(mediaUrl);
         const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
 
-        if (Array.isArray(browserCookies) && browserCookies.length > 0) {
+        // TESTE TEMPORÁRIO: Ignora cookies se for YouTube para testar download publicamente
+        const isYouTube = targetDomain.includes('youtube.com');
+
+        if (!isYouTube && Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
             browserCookies.forEach(c => {
@@ -70,18 +73,13 @@ app.post('/', async (req, res) => {
             retries: 30
         };
 
-        if (cookieFilePath) {
+        if (cookieFilePath && fs.existsSync(cookieFilePath)) {
             options.cookies = cookieFilePath;
         }
 
-        // Configuração ultra-resistente para o YouTube e Shorts
-        if (targetDomain.includes('youtube.com')) {
-            options.extractorArgs = 'youtube:player_client=mweb,ios,web';
-            options.addHeader = [
-                'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
-                'Accept-Language: pt-BR,pt;q=0.9',
-                'Referer: https://www.youtube.com/'
-            ];
+        if (isYouTube) {
+            // Força cliente web padrão do yt-dlp sem passar cookies de usuário
+            options.extractorArgs = 'youtube:player_client=web';
         } else if (targetDomain.includes('facebook.com')) {
             if (mediaUrl.includes('/stories/')) {
                 options.addHeader = [
@@ -108,7 +106,7 @@ app.post('/', async (req, res) => {
             options.preferFreeFormats = true;
         }
 
-        console.log(`[ASSERTIVE ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
+        console.log(`[ASSERTIVE ENGINE] Processando [${targetDomain}] (Cookies ignorados: ${isYouTube}) | Modo: ${mode} | URL: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
