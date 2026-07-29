@@ -6,15 +6,23 @@ const fs = require('fs');
 
 const app = express();
 
-// Configuração robusta de CORS para aceitar requisições de extensões do Chrome e clientes externos
+// Configuração global de CORS ultra-permissiva para a extensão
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
-// Tratamento explícito para requisições de pré-voo (OPTIONS)
-app.options('*', cors());
+// Força os cabeçalhos de CORS manualmente em TODAS as respostas (evita bloqueio em caso de erro)
+app.use((req, res, next) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 app.use(express.json());
 
@@ -29,6 +37,13 @@ app.get('/', async (req, res) => {
 
     if (!mediaUrl) {
         return res.status(400).json({ error: "Missing 'url' parameter in request." });
+    }
+
+    // Validação inicial para garantir que é uma URL do YouTube suportada pelo ytdl-core
+    if (!mediaUrl.includes('youtube.com') && !mediaUrl.includes('youtu.be')) {
+        return res.status(400).json({ 
+            error: "Esta API atualmente suporta apenas links do YouTube (@distube/ytdl-core). Links do Instagram ou outras plataformas precisam de tratamentos específicos." 
+        });
     }
 
     if (mediaUrl.includes('youtube.com/watch') && mediaUrl.includes('&list=')) {
