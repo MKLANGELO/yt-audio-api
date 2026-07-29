@@ -9,26 +9,28 @@ const app = express();
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'X-Browser-Cookies']
+    allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
 }));
 
 app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Browser-Cookies");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 
-app.use(express.json());
+// Aumenta o limite de JSON para 50MB para garantir que cookies enormes do FB passem
+app.use(express.json({ limit: '50mb' }));
 
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
-app.get('/', async (req, res) => {
-    const mediaUrl = req.query.url;
-    const mode = req.query.mode || 'video';
-    const browserCookies = req.headers['x-browser-cookies'];
+// Rota agora é POST
+app.post('/', async (req, res) => {
+    const mediaUrl = req.body.url;
+    const mode = req.body.mode || 'video';
+    const browserCookies = req.body.cookies;
 
     if (!mediaUrl) return res.status(400).json({ error: "Missing 'url' parameter." });
 
@@ -36,7 +38,6 @@ app.get('/', async (req, res) => {
     try {
         const targetDomain = new URL(mediaUrl).hostname.replace('www.', '');
         
-        // Converte o cache de cookies recebido para o formato estrito Netscape
         if (browserCookies) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeCookieContent = "# Netscape HTTP Cookie File\n";
@@ -70,7 +71,7 @@ app.get('/', async (req, res) => {
             delete options.format;
         }
 
-        console.log(`Baixando [${targetDomain}]: ${mediaUrl}`);
+        console.log(`Processando via POST [${targetDomain}]: ${mediaUrl}`);
 
         await youtubedl(mediaUrl, options);
 
@@ -110,4 +111,4 @@ app.get('/download/:filename', (req, res) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => console.log(`Servidor rodando na porta ${PORT}`));
+app.listen(PORT, '0.0.0.0', () => console.log(`Servidor POST rodando na porta ${PORT}`));
