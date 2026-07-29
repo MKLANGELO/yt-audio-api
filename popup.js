@@ -1,9 +1,8 @@
 document.addEventListener("DOMContentLoaded", () => {
   const btnDownload = document.getElementById("btn-download");
-  
+
   if (btnDownload) {
     btnDownload.onclick = async (e) => {
-      // Impede qualquer comportamento padrão de formulário ou recarregamento de página
       if (e) e.preventDefault();
 
       const statusEl = document.getElementById("status");
@@ -14,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      statusEl.innerText = "Verificando sessão e mídia...";
+      statusEl.innerText = "Processando download...";
       statusEl.style.color = "#aaa";
 
       try {
@@ -40,41 +39,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
           if (!responseOk) {
             const errorMsg = data.detail || data.error || "Erro no servidor.";
-
-            if (status === 400 && (errorMsg.includes("Sessão expirada") || errorMsg.includes("bot") || errorMsg.includes("login"))) {
-              let loginUrl = "https://www.youtube.com";
-              if (videoUrl.includes("instagram.com")) loginUrl = "https://www.instagram.com";
-              if (videoUrl.includes("facebook.com")) loginUrl = "https://www.facebook.com";
-              if (videoUrl.includes("xvideos.com")) loginUrl = "https://www.xvideos.com";
-
-              statusEl.innerText = "Sessão expirada! Faça login na aba aberta...";
-              statusEl.style.color = "#ffaa00";
-
-              chrome.tabs.create({ url: loginUrl });
-              return;
-            }
-
             statusEl.innerText = "Erro: " + errorMsg;
             statusEl.style.color = "#ff4444";
             return;
           }
 
           if (data && data.token) {
-            statusEl.innerText = "Sessão autorizada! Iniciando download...";
+            statusEl.innerText = "Download iniciado!";
             statusEl.style.color = "#4BB543";
 
-            const cloudApiUrl = "https://baixatudo-bvx4.onrender.com";
-            const downloadUrl = `${cloudApiUrl}/download?token=${data.token}`;
-
+            // Dispara diretamente o download pelo navegador sem abrir abas extras
             chrome.downloads.download({
-              url: downloadUrl,
-              filename: `${safeTitle}.mp4`
+              url: data.token,
+              filename: `${safeTitle}.mp4`,
+              saveAs: false
             }, () => {
               statusEl.innerText = "Download concluído com sucesso!";
               statusEl.style.color = "#4BB543";
             });
           } else {
-            statusEl.innerText = "Erro: Token de download não retornado.";
+            statusEl.innerText = "Erro: Link de download não retornado.";
             statusEl.style.color = "#ff4444";
           }
         });
