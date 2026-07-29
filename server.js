@@ -27,21 +27,6 @@ function cleanOldFiles() {
     } catch(e) {}
 }
 
-function assertSessionIntegrity(domain, cookieFilePath) {
-    if (!cookieFilePath || !fs.existsSync(cookieFilePath)) return true;
-    try {
-        const content = fs.readFileSync(cookieFilePath, 'utf8');
-        if (domain.includes('facebook.com') && !content.includes('c_user')) {
-            throw new Error("Sessão inválida: Cookie 'c_user' ausente para o Facebook.");
-        }
-        if (domain.includes('instagram.com') && !content.includes('sessionid')) {
-            throw new Error("Sessão inválida: Cookie 'sessionid' ausente para o Instagram.");
-        }
-    } catch (err) {
-        throw err;
-    }
-}
-
 app.post('/', async (req, res) => {
     req.setTimeout(300000); 
     cleanOldFiles();
@@ -52,9 +37,8 @@ app.post('/', async (req, res) => {
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
-    // Bloqueio preventivo para URLs genéricas que não contêm mídia
     if (mediaUrl === "https://www.facebook.com/" || mediaUrl.match(/^https:\/\/www\.facebook\.com\/[^\/]+\/?$/)) {
-        return res.status(400).json({ error: "URL inválida. Você tentou baixar a página inicial ou um perfil. Abra um vídeo ou reel específico." });
+        return res.status(400).json({ error: "URL inválida. Abra um vídeo ou reel específico." });
     }
 
     let cookieFilePath = null;
@@ -62,6 +46,7 @@ app.post('/', async (req, res) => {
         const urlObj = new URL(mediaUrl);
         const targetDomain = urlObj.hostname.includes('facebook.com') ? 'facebook.com' : urlObj.hostname.replace('www.', '');
 
+        // Converte e injeta os cookies da aba atual (fundamental para AlpaClass e áreas de membros)
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
@@ -70,10 +55,6 @@ app.post('/', async (req, res) => {
                 netscapeContent += `${d}\tTRUE\t${c.path || '/'}\t${c.secure ? 'TRUE' : 'FALSE'}\t${c.expirationDate ? Math.floor(c.expirationDate) : 2147483647}\t${c.name}\t${c.value}\n`;
             });
             fs.writeFileSync(cookieFilePath, netscapeContent);
-        }
-
-        if (!targetDomain.includes('xvideos.com')) {
-            assertSessionIntegrity(targetDomain, cookieFilePath);
         }
 
         const filePrefix = Date.now();
@@ -94,23 +75,28 @@ app.post('/', async (req, res) => {
             options.cookies = cookieFilePath;
         }
 
-        // Configuração assertiva de headers baseada no tipo exato de URL do Facebook
+        // Asserção de Cabeçalhos por Ecossistema
         if (targetDomain.includes('facebook.com')) {
             if (mediaUrl.includes('/stories/')) {
-                // Stories exigem emulação mobile estrita
                 options.addHeader = [
                     'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBDV/iPhone14,2;FBMD/iPhone;FBSN/iOS;FBSV/16.5;FBSS/3;FBID/phone;FBLC/pt_BR;FBOP/5]',
                     'Accept-Language: pt-BR,pt;q=0.9',
                     'Referer: https://www.facebook.com/'
                 ];
             } else {
-                // Vídeos e Reels do Facebook rodam perfeitamente com User-Agent Desktop do Chrome
                 options.addHeader = [
                     'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                     'Accept-Language: pt-BR,pt;q=0.9',
                     'Referer: https://www.facebook.com/'
                 ];
             }
+        } else if (targetDomain.includes('alpaclass.com')) {
+            // Garante headers genéricos de navegador para plataformas de infoproduto
+            options.addHeader = [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Referer: https://institutoforma.alpaclass.com/'
+            ];
         }
 
         if (mode === 'audio') {
@@ -133,7 +119,7 @@ app.post('/', async (req, res) => {
         const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
         if (!generatedFile) {
-            throw new Error("O motor não conseguiu consolidar o arquivo de mídia no disco.");
+            throw new Error("O motor não conseguiu consolidar o arquivo. A aula pode exigir permissões avançadas de login ou player protegido.");
         }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
@@ -142,7 +128,7 @@ app.post('/', async (req, res) => {
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         console.error("[ENGINE ERROR]", err.message);
-        return res.status(500).json({ error: "Falha na asserção e extração de mídia.", detail: err.message });
+        return res.status(500).json({ error: "Falha na extração de mídia protegida.", detail: err.message });
     }
 });
 
