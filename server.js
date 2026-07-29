@@ -27,15 +27,14 @@ function cleanOldFiles() {
     } catch(e) {}
 }
 
-app.post('/', async (req, res) => {
+// Rota de Processamento e Gravação Server-Side
+app.post('/record-stream', async (req, res) => {
     req.setTimeout(300000); 
     cleanOldFiles();
 
     const mediaUrl = req.body.url;
     const mode = req.body.mode || 'video';
     const browserCookies = req.body.cookies;
-    const customUser = req.body.youtubeUser; // Suporte a login fictício/personalizado para o YouTube
-    const customPass = req.body.youtubePass;
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
@@ -44,15 +43,8 @@ app.post('/', async (req, res) => {
         const urlObj = new URL(mediaUrl);
         const targetDomain = urlObj.hostname.includes('youtube.com') ? 'youtube.com' : urlObj.hostname.replace('www.', '');
 
-        // Se o usuário mandou credenciais fictícias para o YouTube, criamos um arquivo .netrc temporário de autenticação
-        let netrcPath = null;
-        if (targetDomain.includes('youtube.com') && customUser && customPass) {
-            netrcPath = path.join(DOWNLOADS_DIR, `netrc_${Date.now()}`);
-            fs.writeFileSync(netrcPath, `machine youtube.com login ${customUser} password ${customPass}\n`, { mode: 0o600 });
-        }
-
-        if (!targetDomain.includes('youtube.com') && Array.isArray(browserCookies) && browserCookies.length > 0) {
-            cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
+        if (Array.isArray(browserCookies) && browserCookies.length > 0) {
+            cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_rec_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
             browserCookies.forEach(c => {
                 let d = c.domain.startsWith('.') ? c.domain : `.${c.domain}`;
@@ -61,7 +53,7 @@ app.post('/', async (req, res) => {
             fs.writeFileSync(cookieFilePath, netscapeContent);
         }
 
-        const filePrefix = Date.now();
+        const filePrefix = `rec_${Date.now()}`;
         const outputTemplate = path.join(DOWNLOADS_DIR, `${filePrefix}_%(title)s.%(ext)s`);
         
         let options = {
@@ -72,42 +64,36 @@ app.post('/', async (req, res) => {
             noWarnings: true,
             ffmpegLocation: ffmpegPath,
             socketTimeout: 300,
-            retries: 30
+            retries: 30,
+            // Força recodificação e salvamento direto do stream bruto no disco do servidor
+            format: mode === 'audio' ? 'bestaudio/best' : 'best[ext=mp4]/best'
         };
 
-        if (netrcPath) {
-            options.netrc = true;
-            // O yt-dlp lê o arquivo netrc padrão ou configurado nas opções do sistema
-        } else if (cookieFilePath) {
+        if (cookieFilePath) {
             options.cookies = cookieFilePath;
         }
 
         if (targetDomain.includes('youtube.com')) {
-            options.extractorArgs = 'youtube:player_client=mweb,ios,web';
+            options.extractorArgs = 'youtube:player_client=android,web';
         }
 
         if (mode === 'audio') {
             options.extractAudio = true;
             options.audioFormat = 'mp3';
             options.audioQuality = 0;
-            options.format = 'bestaudio/best';
-        } else {
-            options.format = 'best/bestvideo+bestaudio';
-            options.preferFreeFormats = true;
         }
 
-        console.log(`[YOUTUBE AUTH ENGINE] Processando URL com login simulado/personalizado: ${mediaUrl}`);
+        console.log(`[SERVER STREAM RECORDER] Gravando stream no servidor [${targetDomain}] | URL: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        if (netrcPath && fs.existsSync(netrcPath)) fs.unlinkSync(netrcPath);
 
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part') && !f.startsWith('netrc_'));
+        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
 
         if (!generatedFile) {
-            throw new Error("Falha na autenticação ou consolidação do arquivo do YouTube.");
+            throw new Error("O servidor não conseguiu consolidar a gravação do stream.");
         }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
@@ -115,8 +101,8 @@ app.post('/', async (req, res) => {
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        console.error("[YOUTUBE AUTH ERROR]", err.message);
-        return res.status(500).json({ error: "Falha no login ou extração do YouTube. Conta fictícia rejeitada pelo servidor de origem.", detail: err.message });
+        console.error("[SERVER RECORDER ERROR]", err.message);
+        return res.status(500).json({ error: "Falha na gravação server-side do stream.", detail: err.message });
     }
 });
 
@@ -126,15 +112,19 @@ app.get('/download/:filename', (req, res) => {
     
     if (fs.existsSync(filePath)) {
         res.download(filePath, filename, (err) => {
+            // Limpa o cache imediatamente após o download ser concluído pelo cliente
             setTimeout(() => {
                 try {
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+                    if (fs.existsSync(filePath)) {
+                        fs.unlinkSync(filePath);
+                        console.log(`[CACHE CLEAN] Arquivo de stream removido do servidor: ${filename}`);
+                    }
                 } catch(e){}
-            }, 5000);
+            }, 2000);
         });
     } else {
-        res.status(404).json({ error: "Arquivo expirado." });
+        res.status(404).json({ error: "Arquivo expirado ou já limpo do cache." });
     }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor com Módulo de Login YouTube Ativo."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor de Gravação Server-Side Ativo."));
