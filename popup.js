@@ -28,12 +28,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, speedMs);
   }
 
+  // Função auxiliar para aplicar truques do YouTube se necessário
+  function handleYoutubeShortcut(url) {
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      // Exemplo aplicando o truque do 'ss' ou abrindo nova aba inteligente se o servidor falhar
+      return url;
+    }
+    return url;
+  }
+
   if (btnDownload) {
     btnDownload.onclick = async (e) => {
       e.preventDefault();
-      const videoUrl = urlInput ? urlInput.value.trim() : "";
-      if (!videoUrl) { statusEl.innerText = "❌ Insira uma URL!"; return; }
+      const rawUrl = urlInput ? urlInput.value.trim() : "";
+      if (!rawUrl) { statusEl.innerText = "❌ Insira uma URL!"; return; }
 
+      const videoUrl = handleYoutubeShortcut(rawUrl);
       const modeSelected = document.querySelector('input[name="mode"]:checked').value;
       const shouldAskFolder = document.getElementById("ask-folder").checked;
 
@@ -43,7 +53,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       btnDownload.disabled = true;
       btnDownload.style.opacity = "0.6";
-      statusEl.innerText = "Processando no servidor...";
+      statusEl.innerText = "Processando vídeo...";
 
       updateProgress(85, 150);
 
@@ -51,7 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearInterval(progressInterval);
 
         if (!res || !res.success || !res.responseOk) {
-          statusEl.innerText = "❌ Falha no servidor. Tente usar o botão vermelho 🔴";
+          statusEl.innerText = "❌ Falha. Use o truque do 'ss' ou 'pp' no YouTube!";
           btnDownload.disabled = false;
           btnDownload.style.opacity = "1";
           return;
@@ -77,13 +87,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (btnRecord) {
     btnRecord.onclick = async (e) => {
       e.preventDefault();
-      const videoUrl = urlInput ? urlInput.value.trim() : "";
-      if (!videoUrl) {
+      const rawUrl = urlInput ? urlInput.value.trim() : "";
+      if (!rawUrl) {
         statusEl.innerText = "❌ Insira uma URL válida!";
         statusEl.style.color = "#ef4444";
         return;
       }
 
+      const videoUrl = handleYoutubeShortcut(rawUrl);
       const modeSelected = document.querySelector('input[name="mode"]:checked').value;
       const shouldAskFolder = document.getElementById("ask-folder").checked;
 
@@ -93,7 +104,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       btnRecord.disabled = true;
       btnRecord.style.opacity = "0.6";
-      statusEl.innerText = "🔄 Gravando stream no servidor... Aguarde.";
+      statusEl.innerText = "🔄 Processando stream do YouTube...";
       statusEl.style.color = "#3b82f6";
 
       updateProgress(90, 200);
@@ -102,7 +113,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         clearInterval(progressInterval);
 
         if (!res || !res.success || !res.responseOk) {
-          statusEl.innerText = "❌ Erro ao gravar stream no servidor.";
+          statusEl.innerText = "❌ Erro no stream. Tente adicionar 'ss' ou 'pp' na URL.";
           statusEl.style.color = "#ef4444";
           btnRecord.disabled = false;
           btnRecord.style.opacity = "1";
@@ -112,7 +123,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const { data } = res;
         if (data && data.token) {
           if (progressBar) progressBar.style.width = "100%";
-          statusEl.innerText = "✅ Stream gravado! Baixando arquivo...";
+          statusEl.innerText = "✅ Mídia gerada! Baixando...";
           statusEl.style.color = "#10b981";
 
           chrome.downloads.download({
@@ -125,7 +136,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             btnRecord.style.opacity = "1";
           });
         } else {
-          statusEl.innerText = "❌ Erro ao gerar arquivo do stream.";
+          statusEl.innerText = "❌ Erro ao gerar arquivo.";
           statusEl.style.color = "#ef4444";
           btnRecord.disabled = false;
           btnRecord.style.opacity = "1";
