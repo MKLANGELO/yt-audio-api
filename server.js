@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const ytdlExec = require('yt-dlp-exec');
+const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
@@ -38,8 +38,8 @@ app.get('/', async (req, res) => {
         return res.status(400).json({ error: "Missing 'url' parameter in request." });
     }
 
+    let cookieFilePath = null;
     try {
-        let cookieFilePath = null;
         if (browserCookies) {
             cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeCookieContent = "# Netscape HTTP Cookie File\n";
@@ -58,51 +58,56 @@ app.get('/', async (req, res) => {
 
         const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
         
-        const ytdlArgs = {
-            output: outputTemplate,
-            noCheckCertificates: true,
-            noWarnings: true,
-            preferFreeFormats: true,
-        };
-
+        let cmd = `yt-dlp --no-check-certificates --no-warnings --print-json -o "${outputTemplate}" "${mediaUrl}"`;
+        
         if (cookieFilePath) {
-            ytdlArgs.cookies = cookieFilePath;
+            cmd = `yt-dlp --cookies "${cookieFilePath}" --no-check-certificates --no-warnings --print-json -o "${outputTemplate}" "${mediaUrl}"`;
         }
 
         if (mode === 'audio') {
-            ytdlArgs.extractAudio = true;
-            ytdlArgs.audioFormat = 'mp3';
+            cmd = cmd.replace('yt-dlp', 'yt-dlp -x --audio-format mp3');
         } else {
-            ytdlArgs.format = 'best[ext=mp4]/best';
+            cmd += ' -f "best[ext=mp4]/best"';
         }
 
-        console.log(`Baixando URL: ${mediaUrl} [Modo: ${mode}]`);
-        
-        await ytdlExec(mediaUrl, ytdlArgs);
-        
-        if (cookieFilePath && fs.existsSync(cookieFilePath)) {
-            fs.unlinkSync(cookieFilePath);
-        }
+        console.log(`Executando: ${cmd}`);
 
-        const files = fs.readdirSync(DOWNLOADS_DIR);
-        const recentFile = files
-            .filter(f => !f.endsWith('.txt'))
-            .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
-            .sort((a, b) => b.time - a.time)[0];
+        exec(cmd, { maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
+            if (cookieFilePath && fs.existsSync(cookieFilePath)) {
+                try { fs.unlinkSync(cookieFilePath); } catch (e) {}
+            }
 
-        if (!recentFile) {
-            return res.status(500).json({ error: "Falha ao localizar o arquivo baixado no servidor." });
-        }
+            if (error) {
+                console.error("Erro no yt-dlp:", stderr || error.message);
+                if (!res.headersSent) {
+                    return res.status(500).json({ error: "Falha ao processar download.", detail: stderr || error.message });
+                }
+                return;
+            }
 
-        const host = req.get('host');
-        const protocol = req.protocol;
-        const downloadToken = `${protocol}://${host}/download/${recentFile.name}`;
+            const files = fs.readdirSync(DOWNLOADS_DIR);
+            const recentFile = files
+                .filter(f => !f.endsWith('.txt'))
+                .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
+                .sort((a, b) => b.time - a.time)[0];
 
-        return res.json({ token: downloadToken, file: recentFile.name });
+            if (!recentFile) {
+                return res.status(500).json({ error: "Arquivo gerado não encontrado no servidor." });
+            }
+
+            const host = req.get('host');
+            const protocol = req.protocol;
+            const downloadToken = `${protocol}://${host}/download/${recentFile.name}`;
+
+            return res.json({ token: downloadToken, file: recentFile.name });
+        });
 
     } catch (err) {
-        console.error("Erro no processamento do yt-dlp:", err);
-        return res.status(500).json({ error: "Erro ao processar a mídia.", detail: err.message });
+        if (cookieFilePath && fs.existsSync(cookieFilePath)) {
+            try { fs.unlinkSync(cookieFilePath); } catch (e) {}
+        }
+        console.error("Erro interno:", err);
+        return res.status(500).json({ error: "Erro interno no servidor.", detail: err.message });
     }
 });
 
@@ -125,5 +130,5 @@ app.get('/download/:filename', (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Servidor Universal rodando na porta ${PORT}`);
+    console.log(`Servidor Universal nativo rodando na porta ${PORT}`);
 });

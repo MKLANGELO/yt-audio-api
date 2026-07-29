@@ -1,15 +1,14 @@
 {
   "name": "baixatudo-api",
-  "version": "2.0.0",
-  "description": "API Universal de Download (YouTube, Instagram, XVideos e mais)",
+  "version": "2.1.0",
+  "description": "API Universal de Download com yt-dlp nativo",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^4.19.2",
-    "yt-dlp-exec": "^2.5.8"
+    "express": "^4.19.2"
   },
   "engines": {
     "node": ">=18.0.0"
