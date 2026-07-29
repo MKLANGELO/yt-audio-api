@@ -13,7 +13,6 @@ app.use(express.urlencoded({ limit: '100mb', extended: true }));
 const DOWNLOADS_DIR = path.join(__dirname, 'downloads');
 if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
 
-// Limpeza automática de arquivos antigos a cada inicialização ou ciclo
 function cleanOldFiles() {
     try {
         const files = fs.readdirSync(DOWNLOADS_DIR);
@@ -21,7 +20,6 @@ function cleanOldFiles() {
         files.forEach(f => {
             const filePath = path.join(DOWNLOADS_DIR, f);
             const stats = fs.statSync(filePath);
-            // Remove arquivos com mais de 5 minutos do disco do Render
             if (now - stats.mtime.getTime() > 300000) {
                 fs.unlinkSync(filePath);
             }
@@ -53,8 +51,7 @@ app.post('/', async (req, res) => {
             fs.writeFileSync(cookieFilePath, netscapeContent);
         }
 
-        const uniqueId = Date.now();
-        const outputTemplate = path.join(DOWNLOADS_DIR, `${uniqueId}_%(title)s.%(ext)s`);
+        const outputTemplate = path.join(DOWNLOADS_DIR, `${Date.now()}_%(title)s.%(ext)s`);
         
         const options = {
             output: outputTemplate,
@@ -85,38 +82,41 @@ app.post('/', async (req, res) => {
             options.audioQuality = 0;
             options.format = 'bestaudio/best';
         } else {
-            options.format = 'best[ext=mp4]/best[ext=webm]/best';
+            options.format = 'best/bestvideo+bestaudio';
             options.preferFreeFormats = true;
         }
 
+        console.log(`Baixando mídia: ${mediaUrl}`);
         await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
-        // Localiza exatamente o arquivo gerado para esta requisição
+        // CAPTURA BLINDADA: Pega o arquivo mais recente modificado na pasta de downloads (excluindo arquivos de texto)
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const targetFile = files.find(f => f.startsWith(`${uniqueId}_`) && !f.endsWith('.txt'));
+        const validFiles = files.filter(f => !f.endsWith('.txt') && !f.endsWith('.part'));
+        
+        if (validFiles.length === 0) throw new Error("Nenhum arquivo de mídia foi gerado no disco.");
 
-        if (!targetFile) throw new Error("Arquivo não encontrado após o download.");
+        const recentFile = validFiles
+            .map(f => ({ name: f, time: fs.statSync(path.join(DOWNLOADS_DIR, f)).mtime.getTime() }))
+            .sort((a, b) => b.time - a.time)[0].name;
 
-        const downloadToken = `${req.protocol}://${req.get('host')}/download/${targetFile}`;
-        return res.json({ token: downloadToken, file: targetFile });
+        const downloadToken = `${req.protocol}://${req.get('host')}/download/${recentFile}`;
+        return res.json({ token: downloadToken, file: recentFile });
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         console.error("Erro yt-dlp disco:", err.message);
-        return res.status(500).json({ error: "Falha ao processar mídia. Verifique se o link está acessível.", detail: err.message });
+        return res.status(500).json({ error: "Falha ao processar mídia. O link pode estar protegido.", detail: err.message });
     }
 });
 
-// Endpoint que faz o streaming direto do Render para o dispositivo do usuário e se auto-destrói do disco
 app.get('/download/:filename', (req, res) => {
     const filename = req.params.filename;
     const filePath = path.join(DOWNLOADS_DIR, filename);
     
     if (fs.existsSync(filePath)) {
         res.download(filePath, filename, (err) => {
-            // Auto-deleta o arquivo do disco do Render imediatamente após o envio ao usuário concluir
             setTimeout(() => {
                 try {
                     if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -128,4 +128,4 @@ app.get('/download/:filename', (req, res) => {
     }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor com cache inteligente ativo."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor ajustado rodando."));
