@@ -127,12 +127,10 @@ async function processMedia(req, res, isRecordMode = false) {
             ];
         } else if (targetDomain.includes('tiktok.com')) {
             options.addHeader = [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
                 'Referer: https://www.tiktok.com/'
             ];
-            options.extractorArgs = 'tiktok:api_hostname=api16-normal-c-useast1a.tiktokv.com';
+            // Argumento da API do TikTok removido propositalmente para evitar download de .json
         }
 
         console.log(`[CONVERT ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
@@ -142,10 +140,16 @@ async function processMedia(req, res, isRecordMode = false) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
 
         const files = fs.readdirSync(DOWNLOADS_DIR);
-        const generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && !f.endsWith('.txt') && !f.endsWith('.part'));
+        
+        // FILTRO RIGOROSO: Bloqueia qualquer coisa que não seja extensão de mídia
+        const validExtensions = ['.mp4', '.mp3', '.webm', '.m4a'];
+        const generatedFile = files.find(f => 
+            f.startsWith(`${filePrefix}_`) && 
+            validExtensions.some(ext => f.endsWith(ext))
+        );
 
         if (!generatedFile) {
-            throw new Error("O motor não conseguiu consolidar ou converter o arquivo no disco.");
+            throw new Error("O motor não conseguiu consolidar o vídeo final. Provavelmente a rede bloqueou a extração.");
         }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
