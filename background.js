@@ -17,7 +17,8 @@ api.runtime.onMessage.addListener((request, sender, sendResponse) => {
           body: JSON.stringify({
               url: request.url,
               mode: request.mode,
-              cookies: cookieCache[domain]
+              cookies: cookieCache[domain],
+              userAgent: navigator.userAgent // NOVO: Envia a assinatura real do seu navegador
           })
         })
         .then(res => res.json().then(data => ({ status: res.status, ok: res.ok, data })))

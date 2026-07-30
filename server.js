@@ -28,25 +28,23 @@ function cleanOldFiles() {
     } catch(e) {}
 }
 
-async function resolveMaskedUrl(inputUrl) {
+async function resolveMaskedUrl(inputUrl, clientUserAgent) {
     let url = inputUrl;
     try {
         if (url.includes('vm.tiktok.com') || url.includes('vt.tiktok.com')) {
             const response = await fetch(url, {
                 redirect: 'follow',
-                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' }
+                headers: { 'User-Agent': clientUserAgent }
             });
             url = response.url;
         }
         
-        // LIMPEZA DA URL (REMOÇÃO DE RASTREADORES E PARÂMETROS)
         const parsed = new URL(url);
         
         if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
             if (parsed.searchParams.has('v')) return `https://www.youtube.com/watch?v=${parsed.searchParams.get('v')}`;
         }
         
-        // NOVA REGRA TIKTOK: Remove TUDO depois do ID do vídeo (apaga o ?is_from_webapp...)
         if (parsed.hostname.includes('tiktok.com')) {
             return `${parsed.origin}${parsed.pathname}`;
         }
@@ -57,40 +55,43 @@ async function resolveMaskedUrl(inputUrl) {
     }
 }
 
-function configurePlatformOptions(domain, options) {
-    const genericUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+function configurePlatformOptions(domain, options, clientUserAgent) {
+    // Usa a identidade real da máquina do usuário para todas as requisições
+    const ua = clientUserAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
         options.addHeader = [
-            `User-Agent: ${genericUserAgent}`,
+            `User-Agent: ${ua}`,
             'Accept-Language: pt-BR,pt;q=0.9',
             'Referer: https://www.youtube.com/'
         ];
     } 
     else if (domain.includes('instagram.com')) {
         options.addHeader = [
-            `User-Agent: ${genericUserAgent}`,
+            `User-Agent: ${ua}`,
             'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'Referer: https://www.instagram.com/'
         ];
     } 
     else if (domain.includes('facebook.com') || domain.includes('fb.watch')) {
         options.addHeader = [
-            `User-Agent: ${genericUserAgent}`,
+            `User-Agent: ${ua}`,
             'Sec-Fetch-Mode: navigate',
             'Referer: https://www.facebook.com/'
         ];
     } 
     else if (domain.includes('tiktok.com')) {
-        // Tática de User-Agent Mobile para o TikTok, costuma ser menos bloqueado que o PC
+        // TIKTOK: Espelhamento perfeito (User-Agent real + Cookies reais)
         options.addHeader = [
-            'User-Agent: Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36',
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            `User-Agent: ${ua}`,
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Referer: https://www.tiktok.com/'
         ];
+        // Utilizamos o extrator da API web padrão em vez da mobile para casar com os cookies do desktop
+        options.extractorArgs = 'tiktok:api_hostname=api16-core-c-useast1a.tiktokv.com';
     } 
     else {
-        options.addHeader = [`User-Agent: ${genericUserAgent}`];
+        options.addHeader = [`User-Agent: ${ua}`];
     }
 }
 
@@ -101,7 +102,8 @@ async function processMedia(req, res, isRecordMode = false) {
     const rawUrl = req.body.url;
     if (!rawUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
-    const mediaUrl = await resolveMaskedUrl(rawUrl);
+    const clientUserAgent = req.body.userAgent;
+    const mediaUrl = await resolveMaskedUrl(rawUrl, clientUserAgent);
     const mode = req.body.mode || 'video'; 
     const browserCookies = req.body.cookies;
 
@@ -153,7 +155,7 @@ async function processMedia(req, res, isRecordMode = false) {
             options.mergeOutputFormat = 'mp4';
         }
 
-        configurePlatformOptions(targetDomain, options);
+        configurePlatformOptions(targetDomain, options, clientUserAgent);
 
         console.log(`[ENGINE] Rede: [${targetDomain}] | URL Final Limpa: ${mediaUrl}`);
         
@@ -170,7 +172,7 @@ async function processMedia(req, res, isRecordMode = false) {
              generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && validExtensions.some(ext => f.endsWith(ext)));
         }
 
-        if (!generatedFile) throw new Error("O vídeo não pôde ser extraído. Proteção ativa da rede.");
+        if (!generatedFile) throw new Error("A extração falhou. A plataforma ativou a proteção anti-bot.");
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
         return res.json({ token: downloadToken, file: generatedFile });
