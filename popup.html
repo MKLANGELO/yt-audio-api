@@ -16,6 +16,8 @@
             --font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
         }
 
+        /* REMOVE BARRA DE ROLAGEM LATERAL E OCULTA O SCROLLBAR PADRÃO */
+        ::-webkit-scrollbar { display: none; }
         body { 
             width: 480px; 
             font-family: var(--font-family); 
@@ -23,6 +25,8 @@
             background: var(--bg-primary); 
             color: var(--text-primary); 
             margin: 0; 
+            overflow-x: hidden; 
+            scrollbar-width: none; /* Firefox */
         }
 
         h3 { 
@@ -62,11 +66,7 @@
         .modes-panel label { cursor: pointer; display: flex; align-items: center; gap: 4px; }
         .save-options { text-align: center; font-size: 13px; margin-bottom: 16px; color: var(--text-secondary); }
 
-        .grid-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
         .card {
             background: var(--bg-secondary);
@@ -76,54 +76,42 @@
             flex-direction: column;
             gap: 8px;
             border: 1px solid transparent;
-            transition: border-color 0.2s;
         }
 
-        .card:hover {
-            border-color: rgba(255, 255, 255, 0.1);
-        }
+        .card-full { grid-column: span 2; }
 
         input[type="text"] { 
-            width: 100%; 
-            padding: 10px; 
-            box-sizing: border-box; 
-            background: var(--bg-primary); 
-            border: 1px solid #383838; 
-            color: var(--text-primary); 
-            border-radius: var(--radius-small); 
+            width: 100%; padding: 10px; box-sizing: border-box; 
+            background: var(--bg-primary); border: 1px solid #383838; 
+            color: var(--text-primary); border-radius: var(--radius-small); 
             font-size: 12px;
-            transition: border-color 0.2s;
         }
-        
-        input[type="text"]:focus {
-            outline: none;
-            border-color: var(--color-tiktok-cyan);
-        }
+        input[type="text"]:focus { outline: none; border-color: var(--color-tiktok-cyan); }
 
         button { 
-            width: 100%; 
-            padding: 10px; 
-            border: none; 
-            color: #fff; 
-            font-weight: 600; 
-            font-size: 13px;
-            border-radius: var(--radius-small); 
-            cursor: pointer; 
-            transition: transform 0.1s, opacity 0.2s; 
+            width: 100%; padding: 10px; border: none; color: #fff; 
+            font-weight: 600; font-size: 13px; border-radius: var(--radius-small); 
+            cursor: pointer; transition: opacity 0.2s; 
         }
-
         button:hover { opacity: 0.9; }
-        button:active { transform: scale(0.97); }
 
-        /* Brand Colors */
         .btn-tk { background: #000; border: 1px solid #333; }
         .btn-ig { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
         .btn-yt { background: #ff0000; }
         .btn-fb { background: #1877f2; }
         .btn-gen { background: #0be09b; color: #000; }
         .btn-rec { background: #ff4c3a; }
+        .btn-spy { background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%); font-size: 14px; padding: 14px; box-shadow: 0 4px 15px rgba(37, 117, 252, 0.3); }
 
-        #status { font-size: 13px; margin-top: 16px; text-align: center; color: var(--text-secondary); font-weight: 600; }
+        /* MENSAGEM DE STATUS REDESENHADA PARA CABER TEXTOS MAIORES */
+        #status-panel { 
+            background: var(--bg-secondary);
+            border-radius: var(--radius-medium);
+            padding: 14px;
+            margin-top: 16px;
+            display: none; /* Oculto por padrão */
+        }
+        #status { font-size: 15px; text-align: center; color: var(--text-primary); font-weight: 500; line-height: 1.5; }
         #progress-container { width: 100%; background: #383838; border-radius: var(--radius-small); margin-top: 12px; display: none; height: 8px; overflow: hidden; }
         #progress-bar { width: 0%; height: 100%; background: var(--color-tiktok-cyan); transition: width 0.2s; }
     </style>
@@ -131,10 +119,6 @@
 <body>
     <h3>Media Downloader PRO</h3>
     
-    <div class="notice">
-        Copie o link do seu vídeo e cole aqui na rede social referente.<br>Ou abra o vídeo e clique no botão. Caso a extensão não detecte, cole o link no espaço abaixo do botão correspondente.
-    </div>
-
     <div class="modes-panel">
         <label><input type="radio" name="mode" value="video" checked> 🎬 Vídeo</label>
         <label><input type="radio" name="mode" value="audio"> 🎵 Áudio</label>
@@ -148,37 +132,39 @@
     <div class="grid-container">
         <div class="card">
             <button id="btn-tk" class="btn-tk" data-input="url-tk">Baixar TikTok</button>
-            <input type="text" id="url-tk" placeholder="Cole o link do TikTok...">
+            <input type="text" id="url-tk" placeholder="Se o clique falhar, cole o link aqui">
         </div>
-
         <div class="card">
             <button id="btn-ig" class="btn-ig" data-input="url-ig">Baixar Instagram</button>
-            <input type="text" id="url-ig" placeholder="Cole o link do Instagram...">
+            <input type="text" id="url-ig" placeholder="Se o clique falhar, cole o link aqui">
         </div>
-
         <div class="card">
             <button id="btn-yt" class="btn-yt" data-input="url-yt">Baixar YouTube</button>
-            <input type="text" id="url-yt" placeholder="Cole o link do YouTube...">
+            <input type="text" id="url-yt" placeholder="Se o clique falhar, cole o link aqui">
         </div>
-
         <div class="card">
             <button id="btn-fb" class="btn-fb" data-input="url-fb">Baixar Facebook</button>
-            <input type="text" id="url-fb" placeholder="Cole o link do Facebook...">
+            <input type="text" id="url-fb" placeholder="Se o clique falhar, cole o link aqui">
         </div>
-
         <div class="card">
-            <button id="btn-gen" class="btn-gen" data-input="url-gen">🌐 Outras Redes</button>
-            <input type="text" id="url-gen" placeholder="Cole qualquer link...">
+            <button id="btn-gen" class="btn-gen" data-input="url-gen">🌐 Outras Redes / Anúncios</button>
+            <input type="text" id="url-gen" placeholder="Cole o link do site genérico...">
         </div>
-
         <div class="card">
             <button id="btn-record" class="btn-rec" data-input="url-rec">🔴 Gravar Stream</button>
-            <input type="text" id="url-rec" placeholder="Link de site protegido...">
+            <input type="text" id="url-rec" placeholder="Use em sites super protegidos...">
+        </div>
+        
+        <!-- NOVO BOTÃO DE SPY -->
+        <div class="card card-full">
+            <button id="btn-spy" class="btn-spy">🚀 Procurar Produtos Mais Vendidos na Internet</button>
         </div>
     </div>
 
-    <div id="progress-container"><div id="progress-bar"></div></div>
-    <div id="status">Pronto para iniciar.</div>
+    <div id="status-panel">
+        <div id="status"></div>
+        <div id="progress-container"><div id="progress-bar"></div></div>
+    </div>
 
     <script src="popup.js"></script>
 </body>
