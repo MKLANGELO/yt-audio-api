@@ -64,7 +64,6 @@ async function processMedia(req, res, isRecordMode = false) {
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
-    // Bloqueia URLs raiz/home que nao apontam para midias especificas
     if (
         mediaUrl === "https://www.facebook.com/" || 
         mediaUrl.match(/^https:\/\/www\.facebook\.com\/[^\/]+\/?$/) ||
@@ -126,6 +125,14 @@ async function processMedia(req, res, isRecordMode = false) {
                 'Accept-Language: pt-BR,pt;q=0.9',
                 'Referer: https://www.youtube.com/'
             ];
+        } else if (targetDomain.includes('tiktok.com')) {
+            options.addHeader = [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                'Referer: https://www.tiktok.com/'
+            ];
+            options.extractorArgs = 'tiktok:api_hostname=api16-normal-c-useast1a.tiktokv.com';
         }
 
         console.log(`[CONVERT ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
