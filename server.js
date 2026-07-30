@@ -28,32 +28,32 @@ function cleanOldFiles() {
     } catch(e) {}
 }
 
-// ------------------------------------------------------------------
-// SOLUÇÃO: Desmascarador de URLs (Implementação Anti-Scraping TikTok)
-// ------------------------------------------------------------------
 async function resolveMaskedUrl(inputUrl) {
     let url = inputUrl;
     try {
-        // Se for um link curto do TikTok (vm.tiktok / vt.tiktok), interceptamos o redirect
         if (url.includes('vm.tiktok.com') || url.includes('vt.tiktok.com')) {
-            // Usamos Fetch nativo para seguir o link e extrair a URL canônica com o ID real
             const response = await fetch(url, {
                 redirect: 'follow',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-                }
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36' }
             });
-            url = response.url.split('?')[0]; // Limpa rastreadores adicionais
+            url = response.url;
         }
         
-        // Formatação do YouTube
+        // LIMPEZA DA URL (REMOÇÃO DE RASTREADORES E PARÂMETROS)
         const parsed = new URL(url);
+        
         if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
             if (parsed.searchParams.has('v')) return `https://www.youtube.com/watch?v=${parsed.searchParams.get('v')}`;
         }
+        
+        // NOVA REGRA TIKTOK: Remove TUDO depois do ID do vídeo (apaga o ?is_from_webapp...)
+        if (parsed.hostname.includes('tiktok.com')) {
+            return `${parsed.origin}${parsed.pathname}`;
+        }
+
         return url;
     } catch (e) {
-        return inputUrl; // Fallback se o fetch falhar
+        return inputUrl; 
     }
 }
 
@@ -61,8 +61,6 @@ function configurePlatformOptions(domain, options) {
     const genericUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
 
     if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
-        // CORREÇÃO YOUTUBE: Removemos o player android que está sendo bloqueado
-        // e passamos um header limpo para que o yt-dlp dependa puramente do cookies.txt
         options.addHeader = [
             `User-Agent: ${genericUserAgent}`,
             'Accept-Language: pt-BR,pt;q=0.9',
@@ -84,10 +82,10 @@ function configurePlatformOptions(domain, options) {
         ];
     } 
     else if (domain.includes('tiktok.com')) {
-        // CORREÇÃO TIKTOK: Headers reforçados e sem uso de API interna que causava o dump de .json
+        // Tática de User-Agent Mobile para o TikTok, costuma ser menos bloqueado que o PC
         options.addHeader = [
-            `User-Agent: ${genericUserAgent}`,
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'User-Agent: Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36',
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Referer: https://www.tiktok.com/'
         ];
     } 
@@ -103,7 +101,6 @@ async function processMedia(req, res, isRecordMode = false) {
     const rawUrl = req.body.url;
     if (!rawUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
 
-    // Desmascara e resolve a URL ANTES de mandar pro motor
     const mediaUrl = await resolveMaskedUrl(rawUrl);
     const mode = req.body.mode || 'video'; 
     const browserCookies = req.body.cookies;
@@ -135,7 +132,7 @@ async function processMedia(req, res, isRecordMode = false) {
             ffmpegLocation: ffmpegPath,
             socketTimeout: 300,
             retries: 30,
-            noWriteInfoJson: true // IMPEDE ESTRITAMENTE O DOWNLOAD DE ARQUIVOS .JSON
+            noWriteInfoJson: true 
         };
 
         if (cookieFilePath) options.cookies = cookieFilePath;
@@ -158,7 +155,7 @@ async function processMedia(req, res, isRecordMode = false) {
 
         configurePlatformOptions(targetDomain, options);
 
-        console.log(`[ENGINE] Rede: [${targetDomain}] | Modo: ${mode} | URL Final: ${mediaUrl}`);
+        console.log(`[ENGINE] Rede: [${targetDomain}] | URL Final Limpa: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
@@ -173,7 +170,7 @@ async function processMedia(req, res, isRecordMode = false) {
              generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && validExtensions.some(ext => f.endsWith(ext)));
         }
 
-        if (!generatedFile) throw new Error("A extração final falhou. Proteção de cookies ou bloqueio de rede ativado.");
+        if (!generatedFile) throw new Error("O vídeo não pôde ser extraído. Proteção ativa da rede.");
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
         return res.json({ token: downloadToken, file: generatedFile });
