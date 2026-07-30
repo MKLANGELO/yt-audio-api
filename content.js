@@ -19,7 +19,7 @@ function blockPause() {
 }
 setInterval(blockPause, 1000);
 
-// NOVO: Escuta os comandos da extensão para raspar o link direto da memória
+// NOVO: Escuta os comandos da extensão para raspar o link direto da memória (TikTok)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "extractTikTokRaw") {
         try {
@@ -51,5 +51,5 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: false, error: e.message });
         }
     }
-    return true; // Mantém o canal aberto para resposta assíncrona
+    return true; 
 });

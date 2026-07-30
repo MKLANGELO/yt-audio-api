@@ -36,38 +36,34 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, speedMs);
   }
 
-  // --- NOVA FUNÇÃO: DOWNLOAD DIRETO VIA EXTENSÃO (CLIENT-SIDE) ---
-  const processDirectTikTok = (tabId) => {
-      statusEl.innerHTML = "🥷 <b>Infiltrando na página...</b><br><span style='font-size: 13px; color: #a1a1aa;'>Buscando o arquivo original na memória do navegador.</span>";
+  // --- DOWNLOAD DIRETO VIA NAVEGADOR (BOTÃO TIKTOK) ---
+  const processDirectTikTok = (tabId, fallbackUrl, modeSelected, shouldAskFolder) => {
+      statusEl.innerHTML = "🥷 <b>Infiltrando na página (Modo Local)...</b><br><span style='font-size: 13px; color: #a1a1aa;'>Capturando o vídeo direto da memória.</span>";
       updateProgress(50, 50);
 
       chrome.tabs.sendMessage(tabId, { action: "extractTikTokRaw" }, (response) => {
           clearInterval(progressInterval);
           if (chrome.runtime.lastError || !response || !response.success) {
-              // Se falhar na extração local, tenta o método de Gravação de Stream como último recurso
-              statusEl.innerHTML = `
-                <span style="color: #ff4c3a; font-weight: bold;">❌ Vídeo ofuscado.</span>
-                <div style="margin-top: 10px; font-size: 13.5px; text-align: left; color: #e4e4e7; line-height: 1.5;">
-                    Não foi possível ler a memória da página. Clique em <b>🔴 Gravar Stream</b>.
-                </div>`;
+              // Se a extração local falhar, manda pro servidor (o fallback que sabemos que funciona)
+              statusEl.innerHTML = "⚠️ <b>Falha na leitura local.</b><br><span style='font-size: 13px; color: #a1a1aa;'>Redirecionando para o servidor...</span>";
+              processServerDownload("fetchMedia", fallbackUrl, modeSelected, shouldAskFolder);
               return;
           }
 
           if (progressBar) progressBar.style.width = "100%";
-          statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Arquivo .mp4 descriptografado! Baixando...</span>";
+          statusEl.innerHTML = "<span style='color: #0be09b;'>✅ MP4 descriptografado! Baixando...</span>";
           
-          const shouldAskFolder = document.getElementById("ask-folder").checked;
           chrome.downloads.download({
               url: response.link,
-              filename: `tiktok_${Date.now()}.mp4`,
+              filename: `tiktok_local_${Date.now()}.mp4`,
               saveAs: shouldAskFolder
           }, () => {
-              statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Download concluído com sucesso!</span>";
+              statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Download local concluído!</span>";
           });
       });
   };
 
-  // --- FUNÇÃO ORIGINAL: DOWNLOAD VIA SERVIDOR ---
+  // --- DOWNLOAD VIA SERVIDOR RENDER (OUTRAS REDES E FALLBACK) ---
   const processServerDownload = (actionType, rawUrl, modeSelected, shouldAskFolder) => {
       statusEl.innerHTML = actionType === "fetchMedia" ? "🔄 <b>Processando Mídia no Servidor...</b>" : "🔴 <b>Gravando Stream...</b>";
       updateProgress(85, 150);
@@ -79,8 +75,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           statusEl.innerHTML = `
               <span style="color: #ff4c3a; font-weight: bold;">❌ Falha no servidor.</span>
               <div style="margin-top: 10px; font-size: 13.5px; text-align: left; color: #e4e4e7; line-height: 1.5;">
-                  <b>O que fazer agora?</b><br>
-                  1. Em sites com proteção rigorosa, tente o botão <b>🔴 Gravar Stream</b>.
+                  Verifique o link ou tente o botão <b>🔴 Gravar Stream</b>.
               </div>`;
           return;
         }
@@ -118,10 +113,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (progressContainer) progressContainer.style.display = "block";
     if (progressBar) progressBar.style.width = "0%";
 
-    // ROTEAMENTO: Se for TikTok e for um vídeo, usa a extração local. Se não, manda pro servidor.
-    if (inputId === "url-tk" && currentTab && currentTab.url.includes(rawUrl) && modeSelected === "video") {
-        processDirectTikTok(currentTab.id);
+    // ROTEAMENTO: 
+    // Se o usuário clicou em 'Baixar TikTok' (url-tk) E está na aba do TikTok E pediu Vídeo -> Modo Local
+    if (inputId === "url-tk" && currentTab && currentTab.url.includes("tiktok.com") && modeSelected === "video") {
+        processDirectTikTok(currentTab.id, rawUrl, modeSelected, shouldAskFolder);
     } else {
+        // Se for o botão 'Outras Redes' (url-gen) ou qualquer outro -> Manda pro Servidor
         processServerDownload(actionType, rawUrl, modeSelected, shouldAskFolder);
     }
   };
