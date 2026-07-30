@@ -26,12 +26,11 @@ function parseDataFacebook(textoData) {
 }
 
 async function initAdSpy() {
-    // Cria a interface visual de carregamento na tela do Facebook
     const overlay = document.createElement('div');
     overlay.id = "spy-loading-overlay";
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(18, 18, 18, 0.95); z-index: 999999; display: flex;
+        background: #121212; z-index: 999999; display: flex;
         flex-direction: column; align-items: center; justify-content: center;
         color: #fff; font-family: sans-serif;
     `;
@@ -97,7 +96,7 @@ async function initAdSpy() {
             attempts++;
             if (attempts >= 5 || adsData.length > 500) {
                 clearInterval(scrollInterval);
-                statusText.innerText = "Varredura concluída! Montando a interface personalizada...";
+                statusText.innerText = "Varredura concluída! Renderizando Dashboard exclusivo...";
                 setTimeout(() => montarInterfaceClonada(adsData), 2000);
             }
         } else {
@@ -115,18 +114,6 @@ function montarInterfaceClonada(ads) {
 
     vencedores.sort((a, b) => a.dataObjeto - b.dataObjeto);
 
-    // Remove o overlay de carregamento
-    const overlay = document.getElementById("spy-loading-overlay");
-    if(overlay) overlay.remove();
-
-    // Cria o Dashboard HTML customizado cobrindo a tela inteira (Clonando e melhorando a experiência)
-    const dashboard = document.createElement('div');
-    dashboard.style.cssText = `
-        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-        background: #121212; z-index: 9999999; overflow-y: auto;
-        color: #fff; font-family: system-ui, sans-serif; padding: 30px; box-sizing: border-box;
-    `;
-
     let htmlCards = '';
     vencedores.forEach((ad, index) => {
         htmlCards += `
@@ -139,39 +126,42 @@ function montarInterfaceClonada(ads) {
         `;
     });
 
-    dashboard.innerHTML = `
-        <div style="max-width: 1200px; margin: 0 auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #25f4ee; padding-bottom: 15px; margin-bottom: 25px;">
-                <div>
-                    <h2 style="margin: 0; font-size: 24px; background: linear-gradient(131.17deg, #fe2c55, #25f4ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard de Ofertas Vencedoras</h2>
-                    <p style="margin: 5px 0 0 0; color: #a1a1aa; font-size: 14px;">Anúncios validados com mais de 30 dias ativos no mercado.</p>
+    // Substitui todo o conteúdo da página do Facebook pelo nosso Dashboard limpo e profissional
+    document.open();
+    document.write(`
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Dashboard de Ofertas Vencedoras - Meta Ads</title>
+            <style>
+                body { background: #121212; color: #fff; font-family: system-ui, sans-serif; margin: 0; padding: 30px; }
+                @media print { .no-print { display: none !important; } }
+            </style>
+        </head>
+        <body>
+            <div style="max-width: 1200px; margin: 0 auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #25f4ee; padding-bottom: 15px; margin-bottom: 25px;">
+                    <div>
+                        <h2 style="margin: 0; font-size: 24px; background: linear-gradient(131.17deg, #fe2c55, #25f4ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard de Ofertas Vencedoras</h2>
+                        <p style="margin: 5px 0 0 0; color: #a1a1aa; font-size: 14px;">Anúncios validados com mais de 30 dias ativos no mercado.</p>
+                    </div>
+                    <div class="no-print" style="display: flex; gap: 12px;">
+                        <button onclick="window.print()" style="background: #0be09b; color: #000; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;">🖨️ Imprimir / Salvar Relatório PDF</button>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 12px;">
-                    <button id="btn-print-pdf" style="background: #0be09b; color: #000; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;">🖨️ Imprimir / Salvar Relatório PDF</button>
-                    <button id="btn-close-dash" style="background: #ff4c3a; color: #fff; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;">❌ Fechar Painel</button>
+
+                <div style="background: #1c1c1c; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-around; font-size: 14px;">
+                    <div>📊 Total Varridos: <b>${ads.length}</b></div>
+                    <div>🔥 Produtos Vencedores Filtrados: <b style="color: #0be09b;">${vencedores.length}</b></div>
+                    <div>📅 Critério: <b>> 30 Dias Ativos</b></div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                    ${htmlCards}
                 </div>
             </div>
-
-            <div style="background: #1c1c1c; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-around; font-size: 14px;">
-                <div>📊 Total Varridos: <b>${ads.length}</b></div>
-                <div>🔥 Produtos Vencedores Filtrados: <b style="color: #0be09b;">${vencedores.length}</b></div>
-                <div>📅 Critério: <b>> 30 Dias Ativos</b></div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
-                ${htmlCards}
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(dashboard);
-
-    // Ações dos botões criados na interface
-    document.getElementById('btn-print-pdf').onclick = () => {
-        window.print();
-    };
-
-    document.getElementById('btn-close-dash').onclick = () => {
-        dashboard.remove();
-    };
+        </body>
+        </html>
+    `);
+    document.close();
 }
