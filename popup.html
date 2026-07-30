@@ -16,51 +16,25 @@
             --font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif;
         }
 
-        /* REMOVE BARRA DE ROLAGEM LATERAL E OCULTA O SCROLLBAR PADRÃO */
         ::-webkit-scrollbar { display: none; }
         body { 
-            width: 480px; 
-            font-family: var(--font-family); 
-            padding: 16px; 
-            background: var(--bg-primary); 
-            color: var(--text-primary); 
-            margin: 0; 
-            overflow-x: hidden; 
-            scrollbar-width: none; /* Firefox */
+            width: 480px; font-family: var(--font-family); padding: 16px; 
+            background: var(--bg-primary); color: var(--text-primary); 
+            margin: 0; overflow-x: hidden; scrollbar-width: none; 
         }
 
         h3 { 
-            font-size: 22px; 
-            margin-top: 0;
-            margin-bottom: 16px; 
-            text-align: center; 
-            font-weight: 700;
+            font-size: 22px; margin-top: 0; margin-bottom: 16px; 
+            text-align: center; font-weight: 700;
             background: linear-gradient(131.17deg, var(--color-tiktok-red), var(--color-tiktok-cyan));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .notice { 
-            font-size: 13px; 
-            background: var(--bg-secondary); 
-            border-left: 4px solid var(--color-tiktok-cyan); 
-            padding: 12px; 
-            border-radius: var(--radius-medium); 
-            margin-bottom: 16px; 
-            text-align: center; 
-            line-height: 1.4; 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
 
         .modes-panel { 
-            display: flex; 
-            justify-content: center; 
-            gap: 16px;
-            background: var(--bg-secondary); 
-            padding: 12px; 
-            border-radius: var(--radius-medium); 
-            margin-bottom: 16px; 
-            font-size: 14px; 
-            font-weight: 500;
+            display: flex; justify-content: center; gap: 16px;
+            background: var(--bg-secondary); padding: 12px; 
+            border-radius: var(--radius-medium); margin-bottom: 16px; 
+            font-size: 14px; font-weight: 500;
         }
 
         .modes-panel label { cursor: pointer; display: flex; align-items: center; gap: 4px; }
@@ -69,13 +43,9 @@
         .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
         .card {
-            background: var(--bg-secondary);
-            padding: 12px;
-            border-radius: var(--radius-medium);
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            border: 1px solid transparent;
+            background: var(--bg-secondary); padding: 12px;
+            border-radius: var(--radius-medium); display: flex;
+            flex-direction: column; gap: 8px; border: 1px solid transparent;
         }
 
         .card-full { grid-column: span 2; }
@@ -101,15 +71,11 @@
         .btn-fb { background: #1877f2; }
         .btn-gen { background: #0be09b; color: #000; }
         .btn-rec { background: #ff4c3a; }
-        .btn-spy { background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%); font-size: 14px; padding: 14px; box-shadow: 0 4px 15px rgba(37, 117, 252, 0.3); }
+        .btn-spy { background: linear-gradient(90deg, #1877f2 0%, #d946ef 100%); font-size: 14px; padding: 14px; box-shadow: 0 4px 15px rgba(24, 119, 242, 0.3); }
 
-        /* MENSAGEM DE STATUS REDESENHADA PARA CABER TEXTOS MAIORES */
         #status-panel { 
-            background: var(--bg-secondary);
-            border-radius: var(--radius-medium);
-            padding: 14px;
-            margin-top: 16px;
-            display: none; /* Oculto por padrão */
+            background: var(--bg-secondary); border-radius: var(--radius-medium);
+            padding: 14px; margin-top: 16px; display: none; 
         }
         #status { font-size: 15px; text-align: center; color: var(--text-primary); font-weight: 500; line-height: 1.5; }
         #progress-container { width: 100%; background: #383838; border-radius: var(--radius-small); margin-top: 12px; display: none; height: 8px; overflow: hidden; }
@@ -155,9 +121,10 @@
             <input type="text" id="url-rec" placeholder="Use em sites super protegidos...">
         </div>
         
-        <!-- NOVO BOTÃO DE SPY -->
-        <div class="card card-full">
-            <button id="btn-spy" class="btn-spy">🚀 Procurar Produtos Mais Vendidos na Internet</button>
+        <!-- NOVA SEÇÃO: BUSCA DE OFERTAS NO FACEBOOK -->
+        <div class="card card-full" style="background: #1c1c1c; border: 1px solid #383838;">
+            <button id="btn-spy" class="btn-spy">🔎 Procurar ofertas no Facebook</button>
+            <input type="text" id="niche-input" placeholder="Qual o nicho ou categoria de produto você procura. Preencha." style="margin-top: 10px; border-color: #555;">
         </div>
     </div>
 
