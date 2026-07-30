@@ -31,10 +31,9 @@ function cleanOldFiles() {
 app.get('/disk', (req, res) => {
     try {
         const dfOutput = execSync('df -h /').toString();
-        const lines = dfOutput.trim().split('\n');
-        return res.json({ success: true, diskUsage: lines });
+        return res.json({ success: true, diskUsage: dfOutput.trim().split('\n') });
     } catch (err) {
-        return res.status(500).json({ error: "Erro ao ler espaço em disco.", detail: err.message });
+        return res.status(500).json({ error: "Erro ao ler espaço em disco." });
     }
 });
 
@@ -42,14 +41,52 @@ function sanitizeUrl(inputUrl) {
     try {
         const parsed = new URL(inputUrl);
         if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
-            if (parsed.searchParams.has('v')) {
-                const videoId = parsed.searchParams.get('v');
-                return `https://www.youtube.com/watch?v=${videoId}`;
-            }
+            if (parsed.searchParams.has('v')) return `https://www.youtube.com/watch?v=${parsed.searchParams.get('v')}`;
         }
         return inputUrl;
-    } catch (e) {
-        return inputUrl;
+    } catch (e) { return inputUrl; }
+}
+
+// === MÓDULO DE SEPARAÇÃO POR REDE SOCIAL ===
+function configurePlatformOptions(domain, options) {
+    const genericUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+
+    if (domain.includes('youtube.com') || domain.includes('youtu.be')) {
+        // YOUTUBE
+        options.extractorArgs = 'youtube:player_client=android,web';
+        options.addHeader = [
+            `User-Agent: ${genericUserAgent}`,
+            'Accept-Language: pt-BR,pt;q=0.9',
+            'Referer: https://www.youtube.com/'
+        ];
+    } 
+    else if (domain.includes('instagram.com')) {
+        // INSTAGRAM (Reels, Stories, Posts)
+        options.addHeader = [
+            `User-Agent: ${genericUserAgent}`,
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Referer: https://www.instagram.com/'
+        ];
+    } 
+    else if (domain.includes('facebook.com') || domain.includes('fb.watch')) {
+        // FACEBOOK (Vídeos, Reels, Posts)
+        options.addHeader = [
+            `User-Agent: ${genericUserAgent}`,
+            'Sec-Fetch-Mode: navigate',
+            'Referer: https://www.facebook.com/'
+        ];
+    } 
+    else if (domain.includes('tiktok.com')) {
+        // TIKTOK
+        options.addHeader = [
+            'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Referer: https://www.tiktok.com/'
+        ];
+    } 
+    else {
+        // OUTRAS REDES (Genérico)
+        options.addHeader = [`User-Agent: ${genericUserAgent}`];
     }
 }
 
@@ -59,21 +96,10 @@ async function processMedia(req, res, isRecordMode = false) {
 
     const rawUrl = req.body.url;
     const mediaUrl = sanitizeUrl(rawUrl);
-    const mode = req.body.mode || 'video';
+    const mode = req.body.mode || 'video'; // Modos: 'video', 'audio', 'image'
     const browserCookies = req.body.cookies;
 
     if (!mediaUrl) return res.status(400).json({ error: "Parâmetro 'url' ausente." });
-
-    if (
-        mediaUrl === "https://www.facebook.com/" || 
-        mediaUrl.match(/^https:\/\/www\.facebook\.com\/[^\/]+\/?$/) ||
-        mediaUrl === "https://www.tiktok.com/" ||
-        mediaUrl === "https://www.tiktok.com/pt-BR" ||
-        mediaUrl === "https://www.tiktok.com/pt-BR/" ||
-        mediaUrl.match(/^https:\/\/www\.tiktok\.com\/(@[^\/]+)?\/?$/)
-    ) {
-        return res.status(400).json({ error: "URL inválida. Abra uma postagem, reel ou vídeo específico do TikTok/Facebook." });
-    }
 
     let cookieFilePath = null;
     try {
@@ -81,7 +107,7 @@ async function processMedia(req, res, isRecordMode = false) {
         const targetDomain = urlObj.hostname.replace('www.', '');
 
         if (Array.isArray(browserCookies) && browserCookies.length > 0) {
-            cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${isRecordMode ? 'rec_' : ''}${Date.now()}.txt`);
+            cookieFilePath = path.join(DOWNLOADS_DIR, `cookies_${Date.now()}.txt`);
             let netscapeContent = "# Netscape HTTP Cookie File\n\n";
             browserCookies.forEach(c => {
                 let d = c.domain.startsWith('.') ? c.domain : `.${c.domain}`;
@@ -104,36 +130,33 @@ async function processMedia(req, res, isRecordMode = false) {
             retries: 30
         };
 
-        if (cookieFilePath) {
-            options.cookies = cookieFilePath;
-        }
+        if (cookieFilePath) options.cookies = cookieFilePath;
 
+        // CONFIGURAÇÃO DOS MODOS (VÍDEO, ÁUDIO, IMAGEM)
         if (mode === 'audio') {
             options.extractAudio = true;
             options.audioFormat = 'mp3';
             options.audioQuality = 0;
             options.format = 'bestaudio/best';
+        } else if (mode === 'image') {
+            // Se for modo imagem, mandamos ele focar na foto do post ou gravar a thumbnail
+            options.writeThumbnail = true;
+            // Evitamos fundir formatos de vídeo, pega a mídia nativa.
+            options.format = 'best'; 
+            // Ignorar o download do vídeo PESADO caso queiramos apenas a capa (thumbnail)
+            if(!targetDomain.includes('instagram.com') && !targetDomain.includes('facebook.com')) {
+                options.skipDownload = true; 
+            }
         } else {
+            // MODO VÍDEO PADRÃO
             options.format = 'bestvideo+bestaudio/best';
             options.mergeOutputFormat = 'mp4';
         }
 
-        if (targetDomain.includes('youtube.com')) {
-            options.extractorArgs = 'youtube:player_client=android,web';
-            options.addHeader = [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-                'Accept-Language: pt-BR,pt;q=0.9',
-                'Referer: https://www.youtube.com/'
-            ];
-        } else if (targetDomain.includes('tiktok.com')) {
-            options.addHeader = [
-                'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
-                'Referer: https://www.tiktok.com/'
-            ];
-            // Argumento da API do TikTok removido propositalmente para evitar download de .json
-        }
+        // APLICA CONFIGURAÇÕES ESPECÍFICAS DE CADA REDE
+        configurePlatformOptions(targetDomain, options);
 
-        console.log(`[CONVERT ENGINE] Processando [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
+        console.log(`[ENGINE] Rede: [${targetDomain}] | Modo: ${mode} | URL: ${mediaUrl}`);
         
         await youtubedl(mediaUrl, options);
 
@@ -141,16 +164,18 @@ async function processMedia(req, res, isRecordMode = false) {
 
         const files = fs.readdirSync(DOWNLOADS_DIR);
         
-        // FILTRO RIGOROSO: Bloqueia qualquer coisa que não seja extensão de mídia
-        const validExtensions = ['.mp4', '.mp3', '.webm', '.m4a'];
-        const generatedFile = files.find(f => 
-            f.startsWith(`${filePrefix}_`) && 
-            validExtensions.some(ext => f.endsWith(ext))
-        );
-
-        if (!generatedFile) {
-            throw new Error("O motor não conseguiu consolidar o vídeo final. Provavelmente a rede bloqueou a extração.");
+        // Extensões Válidas atualizadas para aceitar IMAGENS
+        const validExtensions = ['.mp4', '.mp3', '.webm', '.m4a', '.jpg', '.jpeg', '.png', '.webp', '.gif'];
+        
+        // Procurar o arquivo gerado. Se tiver mais de um (ex: vídeo e thumbnail), e for modo imagem, pega a imagem.
+        let generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && f.match(/\.(jpg|jpeg|png|webp|gif)$/i));
+        
+        // Se não achou imagem (ou não era modo imagem), pega o arquivo normal (vídeo/audio)
+        if (!generatedFile || mode !== 'image') {
+             generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && validExtensions.some(ext => f.endsWith(ext)));
         }
+
+        if (!generatedFile) throw new Error("A extração final falhou ou a rede bloqueou o acesso.");
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
         return res.json({ token: downloadToken, file: generatedFile });
@@ -158,7 +183,7 @@ async function processMedia(req, res, isRecordMode = false) {
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
         console.error("[CONVERT ERROR]", err.message);
-        return res.status(500).json({ error: "Falha na conversão e extração de mídia. Certifique-se de usar o link direto do vídeo.", detail: err.message });
+        return res.status(500).json({ error: "Falha na conversão.", detail: err.message });
     }
 }
 
@@ -172,17 +197,12 @@ app.get('/download/:filename', (req, res) => {
     if (fs.existsSync(filePath)) {
         res.download(filePath, filename, (err) => {
             setTimeout(() => {
-                try {
-                    if (fs.existsSync(filePath)) {
-                        fs.unlinkSync(filePath);
-                        console.log(`[CACHE CLEAN] Arquivo removido do servidor: ${filename}`);
-                    }
-                } catch(e){}
+                try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch(e){}
             }, 2000);
         });
     } else {
-        res.status(404).json({ error: "Arquivo expirado ou já limpo do cache." });
+        res.status(404).json({ error: "Arquivo expirado." });
     }
 });
 
-app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor de Conversão e Mídia Ativo."));
+app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor Híbrido Ativo."));
