@@ -96,7 +96,7 @@ async function initAdSpy() {
             attempts++;
             if (attempts >= 5 || adsData.length > 500) {
                 clearInterval(scrollInterval);
-                statusText.innerText = "Varredura concluída! Renderizando Dashboard exclusivo...";
+                statusText.innerText = "Varredura concluída! Ordenando por mais antigos e renderizando Dashboard...";
                 setTimeout(() => montarInterfaceClonada(adsData), 2000);
             }
         } else {
@@ -112,13 +112,14 @@ function montarInterfaceClonada(ads) {
         return diffTempo > TRINTA_DIAS_EM_MS;
     });
 
+    // ORDENAÇÃO CORRIGIDA: Do mais antigo para o mais recente (quem começou há mais tempo vem primeiro)
     vencedores.sort((a, b) => a.dataObjeto - b.dataObjeto);
 
     let htmlCards = '';
     vencedores.forEach((ad, index) => {
         htmlCards += `
             <div style="background: #252525; border: 1px solid #383838; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
-                <div style="font-size: 13px; color: #25f4ee; font-weight: bold;">Anúncio Vencedor #${index + 1}</div>
+                <div style="font-size: 13px; color: #25f4ee; font-weight: bold;">Ranking #${index + 1} (Mais Antigo)</div>
                 <div style="font-size: 14px; color: #e4e4e7;"><b>Início:</b> ${ad.dataTexto}</div>
                 <div style="font-size: 12px; color: #a1a1aa;"><b>ID:</b> ${ad.id}</div>
                 <a href="${ad.link}" target="_blank" style="background: #1877f2; color: #fff; text-align: center; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; margin-top: auto;">🔍 Ver Detalhes do Anúncio</a>
@@ -126,7 +127,6 @@ function montarInterfaceClonada(ads) {
         `;
     });
 
-    // Substitui todo o conteúdo da página do Facebook pelo nosso Dashboard limpo e profissional
     document.open();
     document.write(`
         <html>
@@ -142,8 +142,8 @@ function montarInterfaceClonada(ads) {
             <div style="max-width: 1200px; margin: 0 auto;">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #25f4ee; padding-bottom: 15px; margin-bottom: 25px;">
                     <div>
-                        <h2 style="margin: 0; font-size: 24px; background: linear-gradient(131.17deg, #fe2c55, #25f4ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard de Ofertas Vencedoras</h2>
-                        <p style="margin: 5px 0 0 0; color: #a1a1aa; font-size: 14px;">Anúncios validados com mais de 30 dias ativos no mercado.</p>
+                        <h2 style="margin: 0; font-size: 24px; background: linear-gradient(131.17deg, #fe2c55, #25f4ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard de Ofertas Vencedoras (Ordenado por Mais Antigos)</h2>
+                        <p style="margin: 5px 0 0 0; color: #a1a1aa; font-size: 14px;">Exibindo primeiro os anúncios escalados que rodam há mais de 30 dias.</p>
                     </div>
                     <div class="no-print" style="display: flex; gap: 12px;">
                         <button onclick="window.print()" style="background: #0be09b; color: #000; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;">🖨️ Imprimir / Salvar Relatório PDF</button>
