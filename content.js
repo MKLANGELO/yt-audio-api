@@ -19,21 +19,19 @@ function blockPause() {
 }
 setInterval(blockPause, 1000);
 
-// NOVO: Escuta os comandos da extensão para raspar o link direto da memória (TikTok)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    // ---------------------------------------------------------
+    // 🥷 SNIPER DO TIKTOK
+    // ---------------------------------------------------------
     if (request.action === "extractTikTokRaw") {
         try {
             let directLink = null;
-            
-            // Método 1: Busca no estado universal (Nova arquitetura do TikTok)
             const rehydration = document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__');
             if (rehydration) {
                 const data = JSON.parse(rehydration.textContent);
                 const item = data?.__DEFAULT_SCOPE__?.webapp?.videoDetail?.itemInfo?.itemStruct;
                 if (item?.video?.playAddr) directLink = item.video.playAddr;
             }
-            
-            // Método 2: Busca no SIGI_STATE (Arquitetura anterior/Fallback)
             if (!directLink) {
                 const sigi = document.getElementById('SIGI_STATE');
                 if (sigi) {
@@ -45,11 +43,43 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     }
                 }
             }
-            
             sendResponse({ success: !!directLink, link: directLink });
         } catch(e) {
             sendResponse({ success: false, error: e.message });
         }
     }
+    
+    // ---------------------------------------------------------
+    // 🥷 SNIPER DO YOUTUBE
+    // ---------------------------------------------------------
+    else if (request.action === "extractYouTubeRaw") {
+        try {
+            let directLink = null;
+            
+            // Varre todos os scripts da página atrás do pacote ytInitialPlayerResponse
+            const scripts = Array.from(document.querySelectorAll('script'));
+            const targetScript = scripts.find(s => s.textContent.includes('ytInitialPlayerResponse = {'));
+            
+            if (targetScript) {
+                // Tenta extrair o objeto JSON exato usando expressão regular
+                const match = targetScript.textContent.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/);
+                if (match && match[1]) {
+                    const data = JSON.parse(match[1]);
+                    const formats = data?.streamingData?.formats || [];
+                    
+                    // Caça o melhor formato MP4 que já tem áudio e vídeo juntos E que não esteja criptografado
+                    const bestFormat = formats.find(f => f.mimeType && f.mimeType.includes('video/mp4') && f.url);
+                    
+                    if (bestFormat) {
+                        directLink = bestFormat.url;
+                    }
+                }
+            }
+            sendResponse({ success: !!directLink, link: directLink });
+        } catch(e) {
+            sendResponse({ success: false, error: e.message });
+        }
+    }
+    
     return true; 
 });
