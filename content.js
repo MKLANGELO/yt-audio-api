@@ -50,35 +50,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
     
     // ---------------------------------------------------------
-    // 🥷 SNIPER DO YOUTUBE
+    // 🥷 SNIPER DO YOUTUBE (INJEÇÃO DIRETA NO PLAYER)
     // ---------------------------------------------------------
     else if (request.action === "extractYouTubeRaw") {
-        try {
-            let directLink = null;
-            
-            // Varre todos os scripts da página atrás do pacote ytInitialPlayerResponse
-            const scripts = Array.from(document.querySelectorAll('script'));
-            const targetScript = scripts.find(s => s.textContent.includes('ytInitialPlayerResponse = {'));
-            
-            if (targetScript) {
-                // Tenta extrair o objeto JSON exato usando expressão regular
-                const match = targetScript.textContent.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/);
-                if (match && match[1]) {
-                    const data = JSON.parse(match[1]);
-                    const formats = data?.streamingData?.formats || [];
+        // Cria um ouvinte para receber a resposta do script injetado
+        const listener = function(event) {
+            if (event.source === window && event.data.type === 'YOUTUBE_SNIPER_RESULT') {
+                window.removeEventListener('message', listener);
+                sendResponse({ 
+                    success: !!event.data.link, 
+                    link: event.data.link, 
+                    error: event.data.error 
+                });
+            }
+        };
+        window.addEventListener('message', listener);
+
+        // Injeta um script no mundo principal (Main World) da página para acessar a API do YouTube
+        const script = document.createElement('script');
+        script.textContent = `
+            try {
+                // Acessa o cérebro do player atual (o mesmo que gera o 'Copiar URL do vídeo')
+                const player = document.getElementById('movie_player');
+                
+                // Puxa a resposta de streaming ao vivo e atualizada do player
+                const response = player ? player.getPlayerResponse() : (window.ytInitialPlayerResponse || {});
+                
+                let directLink = null;
+                
+                if (response && response.streamingData && response.streamingData.formats) {
+                    const formats = response.streamingData.formats;
                     
-                    // Caça o melhor formato MP4 que já tem áudio e vídeo juntos E que não esteja criptografado
+                    // Procura o arquivo unificado (Áudio + Vídeo) que o YouTube mantém por compatibilidade
                     const bestFormat = formats.find(f => f.mimeType && f.mimeType.includes('video/mp4') && f.url);
                     
                     if (bestFormat) {
                         directLink = bestFormat.url;
                     }
                 }
+                
+                // Envia de volta para a extensão
+                window.postMessage({ type: 'YOUTUBE_SNIPER_RESULT', link: directLink }, '*');
+            } catch(e) {
+                window.postMessage({ type: 'YOUTUBE_SNIPER_RESULT', link: null, error: e.message }, '*');
             }
-            sendResponse({ success: !!directLink, link: directLink });
-        } catch(e) {
-            sendResponse({ success: false, error: e.message });
-        }
+        `;
+        
+        document.documentElement.appendChild(script);
+        script.remove(); // Limpa o rastro do script
+        
+        return true; // Mantém a porta de comunicação aberta para aguardar a resposta
     }
     
     return true; 
