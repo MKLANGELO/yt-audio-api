@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Universal Media Downloader",
-  "version": "2.0",
-  "description": "Baixe vídeos via servidor ou grave streams protegidos.",
+  "name": "Universal Media Downloader PRO",
+  "version": "2.1",
+  "description": "Baixe mídias restritas e encontre anúncios vencedores.",
   "permissions": [
     "activeTab",
     "cookies",
     "downloads",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -27,6 +28,11 @@
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_end"
+    },
+    {
+      "matches": ["*://*.facebook.com/ads/library/*"],
+      "js": ["fb-spy.js"],
+      "run_at": "document_idle"
     }
   ]
 }
