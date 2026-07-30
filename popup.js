@@ -6,9 +6,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   let progressInterval;
   let currentProgress = 0;
+  let currentTab = null;
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    currentTab = tab;
     if (tab && tab.url) {
         const url = tab.url;
         if (url.includes("tiktok.com")) document.getElementById("url-tk").value = url;
@@ -34,14 +36,78 @@ document.addEventListener("DOMContentLoaded", async () => {
     }, speedMs);
   }
 
+  // --- NOVA FUNÇÃO: DOWNLOAD DIRETO VIA EXTENSÃO (CLIENT-SIDE) ---
+  const processDirectTikTok = (tabId) => {
+      statusEl.innerHTML = "🥷 <b>Infiltrando na página...</b><br><span style='font-size: 13px; color: #a1a1aa;'>Buscando o arquivo original na memória do navegador.</span>";
+      updateProgress(50, 50);
+
+      chrome.tabs.sendMessage(tabId, { action: "extractTikTokRaw" }, (response) => {
+          clearInterval(progressInterval);
+          if (chrome.runtime.lastError || !response || !response.success) {
+              // Se falhar na extração local, tenta o método de Gravação de Stream como último recurso
+              statusEl.innerHTML = `
+                <span style="color: #ff4c3a; font-weight: bold;">❌ Vídeo ofuscado.</span>
+                <div style="margin-top: 10px; font-size: 13.5px; text-align: left; color: #e4e4e7; line-height: 1.5;">
+                    Não foi possível ler a memória da página. Clique em <b>🔴 Gravar Stream</b>.
+                </div>`;
+              return;
+          }
+
+          if (progressBar) progressBar.style.width = "100%";
+          statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Arquivo .mp4 descriptografado! Baixando...</span>";
+          
+          const shouldAskFolder = document.getElementById("ask-folder").checked;
+          chrome.downloads.download({
+              url: response.link,
+              filename: `tiktok_${Date.now()}.mp4`,
+              saveAs: shouldAskFolder
+          }, () => {
+              statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Download concluído com sucesso!</span>";
+          });
+      });
+  };
+
+  // --- FUNÇÃO ORIGINAL: DOWNLOAD VIA SERVIDOR ---
+  const processServerDownload = (actionType, rawUrl, modeSelected, shouldAskFolder) => {
+      statusEl.innerHTML = actionType === "fetchMedia" ? "🔄 <b>Processando Mídia no Servidor...</b>" : "🔴 <b>Gravando Stream...</b>";
+      updateProgress(85, 150);
+
+      chrome.runtime.sendMessage({ action: actionType, url: rawUrl, mode: modeSelected }, (res) => {
+        clearInterval(progressInterval);
+
+        if (!res || !res.success || !res.responseOk) {
+          statusEl.innerHTML = `
+              <span style="color: #ff4c3a; font-weight: bold;">❌ Falha no servidor.</span>
+              <div style="margin-top: 10px; font-size: 13.5px; text-align: left; color: #e4e4e7; line-height: 1.5;">
+                  <b>O que fazer agora?</b><br>
+                  1. Em sites com proteção rigorosa, tente o botão <b>🔴 Gravar Stream</b>.
+              </div>`;
+          return;
+        }
+
+        if (res.data && res.data.token) {
+          if (progressBar) progressBar.style.width = "100%";
+          statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Download iniciado!</span>";
+          
+          chrome.downloads.download({
+            url: res.data.token,
+            filename: res.data.file.replace(/^rec_\d+_+/, ''),
+            saveAs: shouldAskFolder
+          }, () => {
+            statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Arquivo salvo!</span>";
+          });
+        }
+      });
+  };
+
   const processDownload = async (actionType, inputId) => {
     const urlInput = document.getElementById(inputId);
     const rawUrl = urlInput ? urlInput.value.trim() : "";
     
-    statusPanel.style.display = "block"; // Exibe o painel
+    statusPanel.style.display = "block";
 
     if (!rawUrl) { 
-        statusEl.innerHTML = "❌ <b>Nenhum link detectado!</b><br><br><span style='font-size: 13px; color: #a1a1aa;'>Copie o link do vídeo desejado e cole no campo acima antes de clicar.</span>"; 
+        statusEl.innerHTML = "❌ <b>Nenhum link detectado!</b>"; 
         return; 
     }
 
@@ -52,39 +118,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (progressContainer) progressContainer.style.display = "block";
     if (progressBar) progressBar.style.width = "0%";
 
-    statusEl.innerHTML = actionType === "fetchMedia" ? "🔄 <b>Processando Mídia...</b>" : "🔴 <b>Gravando Stream...</b>";
-    
-    updateProgress(85, 150);
-
-    chrome.runtime.sendMessage({ action: actionType, url: rawUrl, mode: modeSelected }, (res) => {
-      clearInterval(progressInterval);
-
-      if (!res || !res.success || !res.responseOk) {
-        // MENSAGEM DE ERRO APRIMORADA E MAIOR
-        statusEl.innerHTML = `
-            <span style="color: #ff4c3a; font-weight: bold;">❌ Falha na captura do vídeo.</span>
-            <div style="margin-top: 10px; font-size: 13.5px; text-align: left; color: #e4e4e7; line-height: 1.5;">
-                <b>O que fazer agora?</b><br>
-                1. Certifique-se de que o link inserido é válido.<br>
-                2. <b>Se o botão direto falhou</b>, copie e cole o link manualmente.<br>
-                3. Em sites com proteção rigorosa, tente o botão <b>🔴 Gravar Stream</b>.
-            </div>`;
-        return;
-      }
-
-      if (res.data && res.data.token) {
-        if (progressBar) progressBar.style.width = "100%";
-        statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Download iniciado com sucesso!</span>";
-        
-        chrome.downloads.download({
-          url: res.data.token,
-          filename: res.data.file.replace(/^rec_\d+_+/, ''),
-          saveAs: shouldAskFolder
-        }, () => {
-          statusEl.innerHTML = "<span style='color: #0be09b;'>✅ Arquivo salvo!</span>";
-        });
-      }
-    });
+    // ROTEAMENTO: Se for TikTok e for um vídeo, usa a extração local. Se não, manda pro servidor.
+    if (inputId === "url-tk" && currentTab && currentTab.url.includes(rawUrl) && modeSelected === "video") {
+        processDirectTikTok(currentTab.id);
+    } else {
+        processServerDownload(actionType, rawUrl, modeSelected, shouldAskFolder);
+    }
   };
 
   const buttons = document.querySelectorAll("button:not(#btn-spy)");
@@ -97,28 +136,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       };
   });
 
-  // NOVO: Ação do Botão Ad Spy
   const spyBtn = document.getElementById("btn-spy");
   if(spyBtn) {
       spyBtn.onclick = (e) => {
           e.preventDefault();
           statusPanel.style.display = "block";
-          statusEl.innerHTML = "🚀 <b>Conectando à API de Produtos...</b><br><span style='font-size: 12px; color: #a1a1aa;'>Buscando anúncios vencedores nas redes.</span>";
-          
+          statusEl.innerHTML = "🚀 <b>Conectando à API...</b>";
           fetch("https://baixatudo-bvx4.onrender.com/spy-products")
             .then(res => res.json())
             .then(data => {
-                if(data.success) {
-                    statusEl.innerHTML = `✅ <b>Busca concluída!</b><br><span style='font-size: 12px; color: #0be09b;'>Verifique a resposta da OutlierKit no painel da API.</span>`;
-                    // Aqui você pode fazer o Chrome abrir uma nova aba com os resultados:
-                    // chrome.tabs.create({ url: data.dashboardUrl });
-                } else {
-                    statusEl.innerHTML = `❌ <b>Aviso:</b> API Key da OutlierKit não configurada no servidor.`;
-                }
+                if(data.success) statusEl.innerHTML = `✅ <b>Busca concluída!</b>`;
+                else statusEl.innerHTML = `❌ <b>Aviso:</b> API Key não configurada.`;
             })
-            .catch(err => {
-                statusEl.innerHTML = `❌ <b>Erro ao acessar o motor de anúncios.</b>`;
-            });
+            .catch(err => { statusEl.innerHTML = `❌ <b>Erro na API.</b>`; });
       };
   }
 });
