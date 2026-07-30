@@ -112,7 +112,6 @@ function montarInterfaceClonada(ads) {
         return diffTempo > TRINTA_DIAS_EM_MS;
     });
 
-    // ORDENAÇÃO CORRIGIDA: Do mais antigo para o mais recente (quem começou há mais tempo vem primeiro)
     vencedores.sort((a, b) => a.dataObjeto - b.dataObjeto);
 
     let htmlCards = '';
