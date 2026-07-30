@@ -26,10 +26,12 @@ function parseDataFacebook(textoData) {
 }
 
 async function initAdSpy() {
+    // Cria a interface visual de carregamento na tela do Facebook
     const overlay = document.createElement('div');
+    overlay.id = "spy-loading-overlay";
     overlay.style.cssText = `
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(18, 18, 18, 0.9); z-index: 999999; display: flex;
+        background: rgba(18, 18, 18, 0.95); z-index: 999999; display: flex;
         flex-direction: column; align-items: center; justify-content: center;
         color: #fff; font-family: sans-serif;
     `;
@@ -37,14 +39,16 @@ async function initAdSpy() {
     const title = document.createElement('h1');
     title.innerText = "🕵️ Minerador de Produtos Vencedores Ativo";
     title.style.marginBottom = "20px";
+    title.style.color = "#25f4ee";
     
     const counter = document.createElement('h2');
     counter.innerText = "Anúncios analisados: 0";
     counter.style.color = "#0be09b";
     
     const statusText = document.createElement('p');
-    statusText.innerText = "Rolando a página para carregar anúncios antigos...";
+    statusText.innerText = "Varrendo a Biblioteca de Anúncios e coletando dados...";
     statusText.style.marginTop = "20px";
+    statusText.style.color = "#a1a1aa";
     
     overlay.appendChild(title);
     overlay.appendChild(counter);
@@ -93,8 +97,8 @@ async function initAdSpy() {
             attempts++;
             if (attempts >= 5 || adsData.length > 500) {
                 clearInterval(scrollInterval);
-                statusText.innerText = "Varredura concluída! Gerando relatório PDF...";
-                setTimeout(() => gerarRelatorio(adsData), 2000);
+                statusText.innerText = "Varredura concluída! Montando a interface personalizada...";
+                setTimeout(() => montarInterfaceClonada(adsData), 2000);
             }
         } else {
             attempts = 0;
@@ -103,7 +107,7 @@ async function initAdSpy() {
     }, 1500);
 }
 
-function gerarRelatorio(ads) {
+function montarInterfaceClonada(ads) {
     const vencedores = ads.filter(ad => {
         const diffTempo = HOJE.getTime() - ad.dataObjeto.getTime();
         return diffTempo > TRINTA_DIAS_EM_MS;
@@ -111,66 +115,63 @@ function gerarRelatorio(ads) {
 
     vencedores.sort((a, b) => a.dataObjeto - b.dataObjeto);
 
-    let htmlContent = `
-        <html>
-        <head>
-            <title>Relatório de Produtos Vencedores</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-                h1 { color: #1877f2; border-bottom: 2px solid #1877f2; padding-bottom: 10px; }
-                .summary { background: #f0f2f5; padding: 15px; border-radius: 8px; margin-bottom: 30px; font-weight: bold; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-                th { background-color: #1877f2; color: white; }
-                tr:nth-child(even) { background-color: #f9f9f9; }
-                a { color: #1877f2; text-decoration: none; font-weight: bold; }
-                a:hover { text-decoration: underline; }
-                .print-btn { background: #0be09b; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 5px; margin-bottom: 20px; }
-                @media print { .print-btn { display: none; } }
-            </style>
-        </head>
-        <body>
-            <h1>Relatório Meta Ads: Produtos Vencedores e Escalados</h1>
-            <div class="summary">
-                Total de Anúncios Analisados: ${ads.length}<br>
-                Anúncios Vencedores (Mais de 30 dias ativos): ${vencedores.length}<br>
-                Data da Análise: ${HOJE.toLocaleDateString('pt-BR')}
-            </div>
-            
-            <button class="print-btn" onclick="window.print()">🖨️ Salvar como PDF</button>
+    // Remove o overlay de carregamento
+    const overlay = document.getElementById("spy-loading-overlay");
+    if(overlay) overlay.remove();
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Nº</th>
-                        <th>Data de Início</th>
-                        <th>ID da Biblioteca</th>
-                        <th>Link do Anúncio</th>
-                    </tr>
-                </thead>
-                <tbody>
+    // Cria o Dashboard HTML customizado cobrindo a tela inteira (Clonando e melhorando a experiência)
+    const dashboard = document.createElement('div');
+    dashboard.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: #121212; z-index: 9999999; overflow-y: auto;
+        color: #fff; font-family: system-ui, sans-serif; padding: 30px; box-sizing: border-box;
     `;
 
+    let htmlCards = '';
     vencedores.forEach((ad, index) => {
-        htmlContent += `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${ad.dataTexto}</td>
-                <td>${ad.id}</td>
-                <td><a href="${ad.link}" target="_blank">Ver Detalhes do Anúncio</a></td>
-            </tr>
+        htmlCards += `
+            <div style="background: #252525; border: 1px solid #383838; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="font-size: 13px; color: #25f4ee; font-weight: bold;">Anúncio Vencedor #${index + 1}</div>
+                <div style="font-size: 14px; color: #e4e4e7;"><b>Início:</b> ${ad.dataTexto}</div>
+                <div style="font-size: 12px; color: #a1a1aa;"><b>ID:</b> ${ad.id}</div>
+                <a href="${ad.link}" target="_blank" style="background: #1877f2; color: #fff; text-align: center; padding: 10px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 13px; margin-top: auto;">🔍 Ver Detalhes do Anúncio</a>
+            </div>
         `;
     });
 
-    htmlContent += `
-                </tbody>
-            </table>
-        </body>
-        </html>
+    dashboard.innerHTML = `
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #25f4ee; padding-bottom: 15px; margin-bottom: 25px;">
+                <div>
+                    <h2 style="margin: 0; font-size: 24px; background: linear-gradient(131.17deg, #fe2c55, #25f4ee); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Dashboard de Ofertas Vencedoras</h2>
+                    <p style="margin: 5px 0 0 0; color: #a1a1aa; font-size: 14px;">Anúncios validados com mais de 30 dias ativos no mercado.</p>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button id="btn-print-pdf" style="background: #0be09b; color: #000; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;">🖨️ Imprimir / Salvar Relatório PDF</button>
+                    <button id="btn-close-dash" style="background: #ff4c3a; color: #fff; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px;">❌ Fechar Painel</button>
+                </div>
+            </div>
+
+            <div style="background: #1c1c1c; padding: 15px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-around; font-size: 14px;">
+                <div>📊 Total Varridos: <b>${ads.length}</b></div>
+                <div>🔥 Produtos Vencedores Filtrados: <b style="color: #0be09b;">${vencedores.length}</b></div>
+                <div>📅 Critério: <b>> 30 Dias Ativos</b></div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                ${htmlCards}
+            </div>
+        </div>
     `;
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    document.body.removeChild(document.body.lastChild);
+    document.body.appendChild(dashboard);
+
+    // Ações dos botões criados na interface
+    document.getElementById('btn-print-pdf').onclick = () => {
+        window.print();
+    };
+
+    document.getElementById('btn-close-dash').onclick = () => {
+        dashboard.remove();
+    };
 }
