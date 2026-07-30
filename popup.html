@@ -67,7 +67,6 @@
 
         .btn-tk { background: #000; border: 1px solid #333; }
         .btn-ig { background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
-        .btn-yt { background: #ff0000; }
         .btn-fb { background: #1877f2; }
         .btn-gen { background: #0be09b; color: #000; }
         .btn-rec { background: #ff4c3a; }
@@ -105,10 +104,6 @@
             <input type="text" id="url-ig" placeholder="Se o clique falhar, cole o link aqui">
         </div>
         <div class="card">
-            <button id="btn-yt" class="btn-yt" data-input="url-yt">Baixar YouTube</button>
-            <input type="text" id="url-yt" placeholder="Se o clique falhar, cole o link aqui">
-        </div>
-        <div class="card">
             <button id="btn-fb" class="btn-fb" data-input="url-fb">Baixar Facebook</button>
             <input type="text" id="url-fb" placeholder="Se o clique falhar, cole o link aqui">
         </div>
@@ -116,12 +111,12 @@
             <button id="btn-gen" class="btn-gen" data-input="url-gen">🌐 Outras Redes / Anúncios</button>
             <input type="text" id="url-gen" placeholder="Cole o link do site genérico...">
         </div>
-        <div class="card">
-            <button id="btn-record" class="btn-rec" data-input="url-rec">🔴 Gravar Stream</button>
-            <input type="text" id="url-rec" placeholder="Use em sites super protegidos...">
+        <div class="card card-full">
+            <button id="btn-record" class="btn-rec" data-input="url-rec">🔴 Gravar Stream (Sites Protegidos)</button>
+            <input type="text" id="url-rec" placeholder="Cole o link para gravação...">
         </div>
         
-        <!-- NOVA SEÇÃO: BUSCA DE OFERTAS NO FACEBOOK -->
+        <!-- BUSCA DE OFERTAS NO FACEBOOK -->
         <div class="card card-full" style="background: #1c1c1c; border: 1px solid #383838;">
             <button id="btn-spy" class="btn-spy">🔎 Procurar ofertas no Facebook</button>
             <input type="text" id="niche-input" placeholder="Qual o nicho ou categoria de produto você procura. Preencha." style="margin-top: 10px; border-color: #555;">
