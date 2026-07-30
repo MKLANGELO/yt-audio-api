@@ -39,7 +39,10 @@ async function resolveMaskedUrl(inputUrl, clientUserAgent) {
         if (parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')) {
             if (parsed.searchParams.has('v')) return `https://www.youtube.com/watch?v=${parsed.searchParams.get('v')}`;
         }
-        if (parsed.hostname.includes('tiktok.com')) return `${parsed.origin}${parsed.pathname}`;
+        if (parsed.hostname.includes('tiktok.com')) {
+            // Remove completamente os parâmetros de rastreio e webapp que ativam o bloqueio
+            return `${parsed.origin}${parsed.pathname}`;
+        }
         return url;
     } catch (e) { return inputUrl; }
 }
@@ -54,11 +57,16 @@ function configurePlatformOptions(domain, options, clientUserAgent) {
     } else if (domain.includes('facebook.com') || domain.includes('fb.watch')) {
         options.addHeader = [`User-Agent: ${ua}`, 'Sec-Fetch-Mode: navigate', 'Referer: https://www.facebook.com/'];
     } else if (domain.includes('tiktok.com')) {
-        options.addHeader = [`User-Agent: ${ua}`, 'Accept: text/html,application/xhtml+xml', 'Referer: https://www.tiktok.com/'];
-        options.extractorArgs = 'tiktok:api_hostname=api16-core-c-useast1a.tiktokv.com';
+        // ESTRATÉGIA BLINDADA TIKTOK: Headers de navegador real + bypass de API interna
+        options.addHeader = [
+            `User-Agent: ${ua}`,
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer: https://www.tiktok.com/'
+        ];
+        // Força o extrator a usar a API web oficial e descarta metadados JSON soltos
+        options.extractorArgs = 'tiktok:api_hostname=api16-normal-c-useast1a.tiktokv.com';
     } else {
-        // MOTOR GENÉRICO: Se a URL for de qualquer outro site (Vimeo, sites de dropshipping, blogs),
-        // O yt-dlp usa seu extrator genérico para vasculhar o HTML em busca do vídeo nativo.
         options.addHeader = [`User-Agent: ${ua}`];
     }
 }
@@ -94,8 +102,16 @@ async function processMedia(req, res, isRecordMode = false) {
         const outputTemplate = path.join(DOWNLOADS_DIR, `${filePrefix}_%(title)s.%(ext)s`);
         
         let options = {
-            output: outputTemplate, noCheckCertificates: true, geoBypass: true, noPlaylist: true,
-            noWarnings: true, ffmpegLocation: ffmpegPath, socketTimeout: 300, retries: 30, noWriteInfoJson: true 
+            output: outputTemplate, 
+            noCheckCertificates: true, 
+            geoBypass: true, 
+            noPlaylist: true,
+            noWarnings: true, 
+            ffmpegLocation: ffmpegPath, 
+            socketTimeout: 300, 
+            retries: 30, 
+            noWriteInfoJson: true, // BLOQUEIA A CRIAÇÃO DE QUALQUER ARQUIVO .JSON DE METADADOS
+            writeInfoJson: false
         };
 
         if (cookieFilePath) options.cookies = cookieFilePath;
@@ -111,6 +127,9 @@ async function processMedia(req, res, isRecordMode = false) {
 
         configurePlatformOptions(targetDomain, options, clientUserAgent);
         
+        console.log(`[ENGINE] Processando [${targetDomain}] | URL: ${mediaUrl}`);
+        
+        // Executa a extração
         await youtubedl(mediaUrl, options);
 
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
@@ -119,16 +138,22 @@ async function processMedia(req, res, isRecordMode = false) {
         const validExtensions = ['.mp4', '.mp3', '.webm', '.m4a', '.jpg', '.jpeg', '.png', '.webp', '.gif'];
         
         let generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && f.match(/\.(jpg|jpeg|png|webp|gif)$/i));
-        if (!generatedFile || mode !== 'image') generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && validExtensions.some(ext => f.endsWith(ext)));
+        if (!generatedFile || mode !== 'image') {
+            generatedFile = files.find(f => f.startsWith(`${filePrefix}_`) && validExtensions.some(ext => f.endsWith(ext)));
+        }
 
-        if (!generatedFile) throw new Error("A extração falhou.");
+        // SEGURANÇA EXTRA: Se o arquivo gerado terminar com .json, rejeitamos explicitamente
+        if (!generatedFile || generatedFile.endsWith('.json')) {
+            throw new Error("O TikTok bloqueou o download direto ou retornou metadados JSON inválidos.");
+        }
 
         const downloadToken = `${req.protocol}://${req.get('host')}/download/${encodeURIComponent(generatedFile)}`;
         return res.json({ token: downloadToken, file: generatedFile });
 
     } catch (err) {
         if (cookieFilePath && fs.existsSync(cookieFilePath)) fs.unlinkSync(cookieFilePath);
-        return res.status(500).json({ error: "Falha na conversão.", detail: err.message });
+        console.error("[CONVERT ERROR]", err.message);
+        return res.status(500).json({ error: "Falha na conversão do TikTok.", detail: err.message });
     }
 }
 
@@ -145,37 +170,8 @@ app.get('/download/:filename', (req, res) => {
     } else res.status(404).json({ error: "Arquivo expirado." });
 });
 
-// =================================================================
-// NOVO: ENDPOINT DE AD SPY / PRODUTOS VENCEDORES (OUTLIERKIT API)
-// =================================================================
 app.get('/spy-products', async (req, res) => {
-    try {
-        // Substitua 'SUA_CHAVE_AQUI' pelo token real que a OutlierKit fornece
-        const OUTLIER_API_KEY = process.env.OUTLIER_API_KEY || "SUA_CHAVE_AQUI"; 
-        
-        /* 
-        Exemplo de implementação real (Descomente quando tiver a API Key):
-        const response = await fetch('https://api.outlierkit.com/v1/winning-products', {
-            method: 'GET',
-            headers: { 
-                'Authorization': `Bearer ${OUTLIER_API_KEY}`,
-                'Content-Type': 'application/json' 
-            }
-        });
-        const productsData = await response.json();
-        return res.json({ success: true, data: productsData });
-        */
-
-        // Resposta simulada para validação do front-end
-        if (OUTLIER_API_KEY === "SUA_CHAVE_AQUI") {
-            return res.json({ success: false, message: "É necessário configurar o token da OutlierKit no backend." });
-        }
-
-        return res.json({ success: true, message: "Integração OutlierKit pronta!" });
-
-    } catch (error) {
-        return res.status(500).json({ error: "Falha ao consultar a API de Ad Spy.", detail: error.message });
-    }
+    return res.json({ success: false, message: "Configure o token da OutlierKit." });
 });
 
 app.listen(process.env.PORT || 10000, '0.0.0.0', () => console.log("Servidor Híbrido Ativo."));
