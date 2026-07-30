@@ -96,8 +96,8 @@ async function initAdSpy() {
             attempts++;
             if (attempts >= 5 || adsData.length > 500) {
                 clearInterval(scrollInterval);
-                statusText.innerText = "Varredura concluída! Ordenando por mais antigos e renderizando Dashboard...";
-                setTimeout(() => montarInterfaceClonada(adsData), 2000);
+                statusText.innerText = "Varredura concluída! Abrindo Dashboard exclusivo...";
+                setTimeout(() => abrirDashboardSeguro(adsData), 2000);
             }
         } else {
             attempts = 0;
@@ -106,12 +106,13 @@ async function initAdSpy() {
     }, 1500);
 }
 
-function montarInterfaceClonada(ads) {
+function abrirDashboardSeguro(ads) {
     const vencedores = ads.filter(ad => {
         const diffTempo = HOJE.getTime() - ad.dataObjeto.getTime();
         return diffTempo > TRINTA_DIAS_EM_MS;
     });
 
+    // Ordena do mais antigo para o mais recente
     vencedores.sort((a, b) => a.dataObjeto - b.dataObjeto);
 
     let htmlCards = '';
@@ -126,8 +127,7 @@ function montarInterfaceClonada(ads) {
         `;
     });
 
-    document.open();
-    document.write(`
+    const paginaCompleta = `
         <html>
         <head>
             <meta charset="UTF-8">
@@ -161,6 +161,10 @@ function montarInterfaceClonada(ads) {
             </div>
         </body>
         </html>
-    `);
-    document.close();
+    `;
+
+    // Cria um Blob seguro que contorna as políticas de CSP do navegador
+    const blob = new Blob([paginaCompleta], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
 }
